@@ -133,18 +133,18 @@ class IntradayTradingConfig:
     ALPACA_SECRET_KEY: str = os.getenv("ALPACA_SECRET_KEY", "HTFUB2U7seFy8oezkc9U7Dq7zXtJg6rGo0DmGhnJ")
     ALPACA_BASE_URL: str = "https://paper-api.alpaca.markets"  # Paper trading
     
-    # Watchlist - High volume, liquid stocks for scalping
-    SCALPING_WATCHLIST: List[str] = None
+    # Watchlist - High volume, liquid stocks for intraday trading
+    INTRADAY_WATCHLIST: List[str] = None
     
     def __post_init__(self):
-        if self.SCALPING_WATCHLIST is None:
+        if self.INTRADAY_WATCHLIST is None:
             # Try to import custom watchlist, fallback to default
             try:
                 from stock_watchlist import ACTIVE_WATCHLIST
-                self.SCALPING_WATCHLIST = ACTIVE_WATCHLIST
+                self.INTRADAY_WATCHLIST = ACTIVE_WATCHLIST
             except ImportError:
                 # Optimized watchlist for intraday swing trading
-                self.SCALPING_WATCHLIST = [
+                self.INTRADAY_WATCHLIST = [
                     # Large-cap tech with strong intraday movement
                     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "NFLX",
                     "AMD", "CRM", "ADBE", "PYPL", "UBER", "ZM",
@@ -281,5 +281,5 @@ if __name__ == "__main__":
     print(f"Max Positions: {config.MAX_OPEN_POSITIONS}")
     print(f"Stop Loss: {config.STOP_LOSS_PCT}%")
     print(f"Profit Target: {config.PROFIT_TARGET_PCT}%")
-    print(f"Watchlist: {len(config.SCALPING_WATCHLIST)} symbols")
+    print(f"Watchlist: {len(config.INTRADAY_WATCHLIST)} symbols")
     print(f"Valid Config: {validate_config()}")

@@ -17,7 +17,7 @@ sys.path.insert(0, str(project_root))
 try:
     from core.intraday_engine import IntradayEngine
     from utils.logger import setup_logger
-    import config
+    from config import config
 except ImportError as e:
     print(f"Import error: {e}")
     print("Make sure you're running from the project root directory")
@@ -66,7 +66,7 @@ def main():
             symbols = [s.strip().upper() for s in args.symbols.split(',')]
             logger.info(f"Trading symbols: {symbols}")
         else:
-            symbols = config.SCALPING_WATCHLIST
+            symbols = config.INTRADAY_WATCHLIST
             logger.info(f"Using default symbols: {symbols}")
         
         # Start trading

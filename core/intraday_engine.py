@@ -467,7 +467,7 @@ class IntradayEngine:
             filtered_symbols = []
             self.last_filter_rejections = {}
             
-            for symbol in config.SCALPING_WATCHLIST[:10]:  # Limit to 10 for demo
+            for symbol in config.INTRADAY_WATCHLIST[:10]:  # Limit to 10 for demo
                 try:
                     # Skip symbols with untracked positions (if exclusion is enabled)
                     if (not config.ADOPT_EXISTING_POSITIONS and 
@@ -508,13 +508,13 @@ class IntradayEngine:
             
             current_time = time.time()
             if current_time - self.last_watchlist_log_time >= 300:  # Log every 5 minutes
-                self.logger.info(f"📊 Filtered watchlist: {len(filtered_symbols)} symbols from {len(config.SCALPING_WATCHLIST)}")
+                self.logger.info(f"📊 Filtered watchlist: {len(filtered_symbols)} symbols from {len(config.INTRADAY_WATCHLIST)}")
                 self.last_watchlist_log_time = current_time
             return filtered_symbols
             
         except Exception as e:
             self.logger.error(f"❌ Error filtering watchlist: {e}")
-            return config.SCALPING_WATCHLIST[:5]  # Fallback to first 5
+            return config.INTRADAY_WATCHLIST[:5]  # Fallback to first 5
     
     def generate_signals(self, symbol: str, data: pd.DataFrame) -> List[ScalpingSignal]:
         """
@@ -1887,7 +1887,7 @@ class IntradayEngine:
                 self.logger.warning("❌ Daily limits reached, stopping trading")
                 return
             
-            self.logger.info(f"✅ Trading cycle checks passed - Processing {len(config.SCALPING_WATCHLIST)} symbols")
+            self.logger.info(f"✅ Trading cycle checks passed - Processing {len(config.INTRADAY_WATCHLIST)} symbols")
             
             # Get filtered watchlist
             symbols = self.filter_watchlist()
