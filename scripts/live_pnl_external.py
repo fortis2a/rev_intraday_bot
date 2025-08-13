@@ -119,6 +119,26 @@ def display_live_pnl():
                 print(f"   {Fore.WHITE}[<>] Day Trades: {Fore.YELLOW}{day_trades}/3{Style.RESET_ALL}")
                 print()
                 
+                # Enhanced Technical Indicators Display
+                print(f"{Back.MAGENTA}{Fore.WHITE}[IND] ENHANCED TECHNICAL INDICATORS:{Style.RESET_ALL}")
+                for symbol in watchlist[:3]:  # Show indicators for first 3 symbols
+                    try:
+                        df = dm.get_bars(symbol, '15Min', limit=30)
+                        if not df.empty and len(df) >= 26:
+                            df = dm.calculate_indicators(df)
+                            latest = df.iloc[-1]
+                            
+                            rsi_color = Fore.RED if latest['rsi'] > 70 else Fore.GREEN if latest['rsi'] < 30 else Fore.YELLOW
+                            macd_color = Fore.GREEN if latest['macd'] > latest['macd_signal'] else Fore.RED
+                            vwap_color = Fore.GREEN if latest['price_vs_vwap'] > 0 else Fore.RED
+                            
+                            print(f"   {Fore.CYAN}[{symbol}] {Fore.WHITE}RSI: {rsi_color}{latest['rsi']:.1f}{Style.RESET_ALL} "
+                                  f"{Fore.WHITE}MACD: {macd_color}{latest['macd']:.4f}{Style.RESET_ALL} "
+                                  f"{Fore.WHITE}VWAP: {vwap_color}{latest['price_vs_vwap']:.1%}{Style.RESET_ALL}")
+                    except:
+                        print(f"   {Fore.CYAN}[{symbol}] {Fore.RED}Data unavailable{Style.RESET_ALL}")
+                print()
+                
                 # Position Breakdown
                 print(f"{Back.RED}{Fore.WHITE}[***] LIVE POSITION BREAKDOWN:{Style.RESET_ALL}")
                 print(f"{Fore.YELLOW}{'~'*79}{Style.RESET_ALL}")

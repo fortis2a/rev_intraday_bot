@@ -329,7 +329,7 @@ while True:
                 print("\n[START] Running comprehensive EOD analysis...")
                 self.logger.info("[START] Running EOD analysis")
                 
-                result = subprocess.run([self.python_cmd, 'eod_analysis.py'],
+                result = subprocess.run([self.python_cmd, 'scripts/eod_analysis.py'],
                                       capture_output=True, text=True, timeout=300)
                 
                 if result.returncode == 0:
@@ -395,7 +395,7 @@ while True:
                 print("\n[START] Running manual GitHub backup...")
                 self.logger.info("[START] Running manual GitHub backup")
                 
-                result = subprocess.run([self.python_cmd, 'backup_system.py', 'backup'],
+                result = subprocess.run([self.python_cmd, 'scripts/backup_system.py', 'backup'],
                                       capture_output=True, text=True, timeout=120)
                 
                 if result.returncode == 0:
@@ -414,7 +414,7 @@ while True:
                 self.logger.info("[START] Starting auto backup scheduler")
                 
                 try:
-                    result = subprocess.run([self.python_cmd, 'backup_system.py', 'schedule'],
+                    result = subprocess.run([self.python_cmd, 'scripts/backup_system.py', 'schedule'],
                                           timeout=None)  # No timeout for scheduler
                 except KeyboardInterrupt:
                     print("\n[STOP] Backup scheduler stopped")
@@ -501,10 +501,11 @@ while True:
                 print("10. EOD Analysis (End-of-Day Reports)")
                 print("11. GitHub Backup (Manual & Auto Scheduler)")
                 print("12. Validate Environment")
-                print("13. Stop All Processes")
-                print("14. Exit")
+                print("13. Test Enhanced Indicators (NEW)")
+                print("14. Stop All Processes")
+                print("15. Exit")
                 
-                choice = input("\nEnter your choice (1-14): ").strip()
+                choice = input("\nEnter your choice (1-15): ").strip()
                 
                 if choice == '1':
                     print("\n[START] Starting full trading session...")
@@ -583,19 +584,31 @@ while True:
                         print("[ERROR] Environment validation failed")
                 
                 elif choice == '13':
+                    print("\n[TEST] Testing Enhanced Indicators...")
+                    try:
+                        result = subprocess.run([self.python_cmd, 'test_enhanced_indicators.py'], 
+                                              capture_output=False, text=True)
+                        if result.returncode == 0:
+                            print("[SUCCESS] Enhanced indicators test completed successfully!")
+                        else:
+                            print("[WARNING] Enhanced indicators test completed with warnings")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to run enhanced indicators test: {e}")
+                
+                elif choice == '14':
                     self.stop_all()
                     print("[SUCCESS] All processes stopped")
                 
-                elif choice == '14':
+                elif choice == '15':
                     print("\n[EXIT] Shutting down trading system...")
                     self.stop_all()
                     print("[EXIT] Goodbye!")
                     break
                 
                 else:
-                    print("[ERROR] Invalid choice. Please enter 1-14.")
+                    print("[ERROR] Invalid choice. Please enter 1-15.")
                 
-                if choice != '14':
+                if choice != '15':
                     input("\nPress Enter to continue...")
                 
             except KeyboardInterrupt:

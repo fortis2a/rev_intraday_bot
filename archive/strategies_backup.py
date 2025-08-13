@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Enhanced Trading Strategies for Intraday Trading Bot
+Trading Strategies for Intraday Trading Bot
 ASCII-only, no Unicode characters
-Implements industry best practices: MACD, EMA, VWAP, Bollinger Bands
 """
 
 import pandas as pd
@@ -12,12 +11,12 @@ from config import config
 from logger import setup_logger, clean_message
 
 class MomentumStrategy:
-    """Enhanced Momentum-based trading strategy"""
+    """Momentum-based trading strategy"""
     
     def __init__(self):
         self.logger = setup_logger('momentum_strategy')
-        self.name = "Enhanced Momentum"
-        self.logger.info("Enhanced Momentum Strategy initialized")
+        self.name = "Momentum"
+        self.logger.info("Momentum Strategy initialized")
     
     def generate_signal(self, symbol, df):
         """Generate trading signal based on enhanced momentum analysis"""
@@ -52,12 +51,7 @@ class MomentumStrategy:
             bullish_score = sum(bullish_conditions)
             
             if bullish_score >= 5:
-                # Industry-standard confidence calculation
-                base_confidence = (bullish_score / 8) * 0.85  # 85% max base confidence
-                volume_boost = min(0.15, (volume_ratio - 1.5) * 0.05)  # Volume confirmation bonus
-                momentum_boost = min(0.10, abs(price_change) * 10)  # Price momentum bonus
-                
-                confidence = min(0.95, base_confidence + volume_boost + momentum_boost)
+                confidence = min(0.95, (bullish_score / 8) * (abs(price_change) * 20))
                 
                 signal = {
                     'symbol': symbol,
@@ -91,12 +85,7 @@ class MomentumStrategy:
             bearish_score = sum(bearish_conditions)
             
             if bearish_score >= 5:
-                # Industry-standard confidence calculation
-                base_confidence = (bearish_score / 8) * 0.85  # 85% max base confidence
-                volume_boost = min(0.15, (volume_ratio - 1.5) * 0.05)  # Volume confirmation bonus
-                momentum_boost = min(0.10, abs(price_change) * 10)  # Price momentum bonus
-                
-                confidence = min(0.95, base_confidence + volume_boost + momentum_boost)
+                confidence = min(0.95, (bearish_score / 8) * (abs(price_change) * 20))
                 
                 signal = {
                     'symbol': symbol,
@@ -122,12 +111,12 @@ class MomentumStrategy:
             return None
 
 class MeanReversionStrategy:
-    """Enhanced Mean reversion trading strategy"""
+    """Mean reversion trading strategy"""
     
     def __init__(self):
         self.logger = setup_logger('mean_reversion_strategy')
-        self.name = "Enhanced Mean Reversion"
-        self.logger.info("Enhanced Mean Reversion Strategy initialized")
+        self.name = "Mean Reversion"
+        self.logger.info("Mean Reversion Strategy initialized")
     
     def generate_signal(self, symbol, df):
         """Generate trading signal based on enhanced mean reversion analysis"""
@@ -163,12 +152,7 @@ class MeanReversionStrategy:
             oversold_score = sum(oversold_conditions)
             
             if oversold_score >= 4:  # Need 4 of 7 confirmations
-                # Industry-standard confidence for mean reversion
-                base_confidence = (oversold_score / 7) * 0.80  # 80% max for mean reversion
-                rsi_strength = ((config['RSI_OVERSOLD'] - rsi) / config['RSI_OVERSOLD']) * 0.15
-                volume_boost = min(0.10, (volume_ratio - 1.2) * 0.05)
-                
-                confidence = min(0.90, base_confidence + rsi_strength + volume_boost)
+                confidence = min(0.9, (oversold_score / 7) * ((config['RSI_OVERSOLD'] - rsi) / config['RSI_OVERSOLD']))
                 
                 signal = {
                     'symbol': symbol,
@@ -200,12 +184,7 @@ class MeanReversionStrategy:
             overbought_score = sum(overbought_conditions)
             
             if overbought_score >= 4:  # Need 4 of 7 confirmations
-                # Industry-standard confidence for mean reversion
-                base_confidence = (overbought_score / 7) * 0.80  # 80% max for mean reversion
-                rsi_strength = ((rsi - config['RSI_OVERBOUGHT']) / (100 - config['RSI_OVERBOUGHT'])) * 0.15
-                volume_boost = min(0.10, (volume_ratio - 1.2) * 0.05)
-                
-                confidence = min(0.90, base_confidence + rsi_strength + volume_boost)
+                confidence = min(0.9, (overbought_score / 7) * ((rsi - config['RSI_OVERBOUGHT']) / (100 - config['RSI_OVERBOUGHT'])))
                 
                 signal = {
                     'symbol': symbol,
@@ -234,7 +213,7 @@ class VWAPStrategy:
     
     def __init__(self):
         self.logger = setup_logger('vwap_strategy')
-        self.name = "Enhanced VWAP"
+        self.name = "VWAP Enhanced"
         self.logger.info("Enhanced VWAP Strategy initialized")
     
     def generate_signal(self, symbol, df):
@@ -272,12 +251,7 @@ class VWAPStrategy:
             vwap_bullish_score = sum(vwap_bullish_conditions)
             
             if vwap_bullish_score >= 5:  # Need 5 of 8 confirmations
-                # Industry-standard VWAP bullish confidence
-                base_confidence = (vwap_bullish_score / 8) * 0.85  # 85% max for VWAP momentum
-                price_momentum = min(0.10, abs(price_vs_vwap) * 20)  # Price distance strength
-                volume_boost = min(0.10, (volume_ratio - 1.5) * 0.05)
-                
-                confidence = min(0.90, base_confidence + price_momentum + volume_boost)
+                confidence = min(0.9, (vwap_bullish_score / 8) * (abs(price_vs_vwap) * 50))
                 
                 signal = {
                     'symbol': symbol,
@@ -310,12 +284,7 @@ class VWAPStrategy:
             vwap_bearish_score = sum(vwap_bearish_conditions)
             
             if vwap_bearish_score >= 5:  # Need 5 of 8 confirmations
-                # Industry-standard VWAP bearish confidence
-                base_confidence = (vwap_bearish_score / 8) * 0.85  # 85% max for VWAP momentum
-                price_momentum = min(0.10, abs(price_vs_vwap) * 20)  # Price distance strength
-                volume_boost = min(0.10, (volume_ratio - 1.5) * 0.05)
-                
-                confidence = min(0.90, base_confidence + price_momentum + volume_boost)
+                confidence = min(0.9, (vwap_bearish_score / 8) * (abs(price_vs_vwap) * 50))
                 
                 signal = {
                     'symbol': symbol,
@@ -328,6 +297,38 @@ class VWAPStrategy:
                     'price_vs_vwap': price_vs_vwap,
                     'volume_ratio': volume_ratio,
                     'vwap_bearish_score': vwap_bearish_score
+                }
+                
+                self.logger.info(f"[SIGNAL] {symbol} SELL - {signal['reason']}")
+                return signal
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"[ERROR] Failed to generate VWAP signal for {symbol}: {e}")
+            return None
+                    'price': price,
+                    'vwap': vwap,
+                    'vwap_distance': (price / vwap - 1) * 100
+                }
+                
+                self.logger.info(f"[SIGNAL] {symbol} BUY - {signal['reason']}")
+                return signal
+            
+            # Price falling below VWAP with volume
+            elif (price < vwap and 
+                  prev['close'] >= prev['vwap'] and 
+                  volume_ratio > 1.3):
+                
+                signal = {
+                    'symbol': symbol,
+                    'action': 'SELL',
+                    'strategy': self.name,
+                    'confidence': min(0.9, volume_ratio / 2),
+                    'reason': f"VWAP breakdown: price ${price:.2f} below VWAP ${vwap:.2f}",
+                    'price': price,
+                    'vwap': vwap,
+                    'vwap_distance': (price / vwap - 1) * 100
                 }
                 
                 self.logger.info(f"[SIGNAL] {symbol} SELL - {signal['reason']}")

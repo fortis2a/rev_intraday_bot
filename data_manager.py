@@ -90,7 +90,7 @@ class DataManager:
     def get_bars(self, symbol, timeframe='15Min', limit=100):
         """Get historical bars for a symbol"""
         try:
-            # Calculate start time
+            # Calculate start time with proper formatting
             end_time = datetime.now()
             if timeframe == '1Min':
                 start_time = end_time - timedelta(hours=2)
@@ -101,11 +101,15 @@ class DataManager:
             else:
                 start_time = end_time - timedelta(days=5)
             
+            # Format timestamps for Alpaca API (RFC3339 format)
+            start_str = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            end_str = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            
             bars = self.api.get_bars(
                 symbol,
                 timeframe,
-                start=start_time.isoformat(),
-                end=end_time.isoformat(),
+                start=start_str,
+                end=end_str,
                 limit=limit
             )
             
@@ -143,8 +147,8 @@ class DataManager:
             return {'is_open': False}
     
     def calculate_indicators(self, df):
-        """Calculate technical indicators"""
-        if df.empty or len(df) < 20:
+        """Calculate technical indicators - Enhanced with industry best practices"""
+        if df.empty or len(df) < 26:  # Increased minimum for MACD
             return df
         
         try:
@@ -152,19 +156,47 @@ class DataManager:
             df['sma_10'] = df['close'].rolling(window=10).mean()
             df['sma_20'] = df['close'].rolling(window=20).mean()
             
-            # RSI
+            # Exponential Moving Averages (Industry recommended)
+            df['ema_9'] = df['close'].ewm(span=9, adjust=False).mean()
+            df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
+            
+            # RSI (14-period standard)
             delta = df['close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
             rs = gain / loss
             df['rsi'] = 100 - (100 / (1 + rs))
             
-            # Volume Moving Average
+            # MACD (12, 26, 9) - Industry standard
+            ema_12 = df['close'].ewm(span=12, adjust=False).mean()
+            ema_26 = df['close'].ewm(span=26, adjust=False).mean()
+            df['macd'] = ema_12 - ema_26
+            df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+            df['macd_histogram'] = df['macd'] - df['macd_signal']
+            
+            # VWAP (Volume Weighted Average Price)
+            df['vwap'] = (df['close'] * df['volume']).cumsum() / df['volume'].cumsum()
+            
+            # Bollinger Bands (20-period, 2 std dev)
+            df['bb_middle'] = df['close'].rolling(window=20).mean()
+            bb_std = df['close'].rolling(window=20).std()
+            df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
+            df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
+            df['bb_width'] = (df['bb_upper'] - df['bb_lower']) / df['bb_middle']
+            
+            # Volume Analysis
             df['volume_sma'] = df['volume'].rolling(window=20).mean()
             df['volume_ratio'] = df['volume'] / df['volume_sma']
             
-            # Price change
+            # Price Analysis
             df['price_change'] = df['close'].pct_change()
+            df['price_vs_vwap'] = (df['close'] - df['vwap']) / df['vwap']
+            
+            # Trend Signals
+            df['ema_cross_bullish'] = (df['ema_9'] > df['ema_21']) & (df['ema_9'].shift(1) <= df['ema_21'].shift(1))
+            df['ema_cross_bearish'] = (df['ema_9'] < df['ema_21']) & (df['ema_9'].shift(1) >= df['ema_21'].shift(1))
+            df['macd_cross_bullish'] = (df['macd'] > df['macd_signal']) & (df['macd'].shift(1) <= df['macd_signal'].shift(1))
+            df['macd_cross_bearish'] = (df['macd'] < df['macd_signal']) & (df['macd'].shift(1) >= df['macd_signal'].shift(1))
             
             return df
             

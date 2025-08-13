@@ -8,13 +8,24 @@ Includes auto-scheduling and manual backup options
 import os
 import sys
 import subprocess
-import schedule
 import time
 import logging
 from datetime import datetime
 from pathlib import Path
 import json
 import shutil
+
+# Add parent directory to path to access main modules
+sys.path.append(str(Path(__file__).parent.parent))
+
+# Try to import schedule, install if not available
+try:
+    import schedule
+    SCHEDULE_AVAILABLE = True
+except ImportError:
+    SCHEDULE_AVAILABLE = False
+    print("[WARNING] 'schedule' module not installed. Auto-scheduling will not be available.")
+    print("[INFO] To enable scheduling, run: pip install schedule")
 
 # Set up logging
 log_dir = Path("logs")
@@ -316,6 +327,11 @@ This repository is automatically updated:
 
     def schedule_auto_backup(self):
         """Schedule automatic daily backup at midnight"""
+        if not SCHEDULE_AVAILABLE:
+            print("[ERROR] Scheduling not available - 'schedule' module not installed")
+            print("[INFO] To enable scheduling, run: pip install schedule")
+            return
+            
         logging.info("[SCHEDULE] Scheduling automatic backup at midnight...")
         schedule.every().day.at("00:00").do(self.run_scheduled_backup)
         

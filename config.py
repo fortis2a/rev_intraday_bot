@@ -25,11 +25,20 @@ INTRADAY_WATCHLIST = [
     'IONQ', 'RGTI', 'QBTS', 'JNJ', 'PG'
 ]
 
-# Risk Management
+# Risk Management - Default values (can be overridden by stock-specific settings)
 MAX_POSITION_SIZE = 1000  # Maximum position size in dollars
 MAX_DAILY_LOSS = 500     # Maximum daily loss limit
-STOP_LOSS_PCT = 0.02     # 2% stop loss
-TAKE_PROFIT_PCT = 0.04   # 4% take profit
+STOP_LOSS_PCT = 0.015    # 1.5% default stop loss (conservative)
+TAKE_PROFIT_PCT = 0.020  # 2.0% default take profit (conservative)
+
+# Enable stock-specific thresholds
+USE_STOCK_SPECIFIC_THRESHOLDS = True
+
+# Trailing Stop Configuration - Default values
+TRAILING_STOP_ENABLED = True        # Enable trailing stop functionality
+TRAILING_STOP_PCT = 0.015           # 1.5% default trailing stop distance
+TRAILING_STOP_ACTIVATION = 0.010    # 1.0% profit before trailing activates
+TRAILING_STOP_MIN_MOVE = 0.005      # 0.5% minimum move to adjust trailing stop
 
 # Trading Hours (Eastern Time) - Avoid volatile opening/closing periods
 MARKET_OPEN = time(10, 0)   # 10:00 AM (30 min after market open)
@@ -40,6 +49,10 @@ MOMENTUM_THRESHOLD = 0.015   # 1.5% price movement for momentum
 RSI_OVERSOLD = 30
 RSI_OVERBOUGHT = 70
 VOLUME_MULTIPLIER = 1.5      # Volume must be 1.5x average
+
+# Signal Quality Filters
+MIN_CONFIDENCE_THRESHOLD = 0.75  # 75% minimum confidence for live trading
+MIN_CONFIDENCE_DEMO = 0.50      # 50% minimum for demo/testing
 
 # API Configuration - Load from .env file
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
@@ -86,12 +99,18 @@ config = {
     'MAX_DAILY_LOSS': MAX_DAILY_LOSS,
     'STOP_LOSS_PCT': STOP_LOSS_PCT,
     'TAKE_PROFIT_PCT': TAKE_PROFIT_PCT,
+    'TRAILING_STOP_ENABLED': TRAILING_STOP_ENABLED,
+    'TRAILING_STOP_PCT': TRAILING_STOP_PCT,
+    'TRAILING_STOP_ACTIVATION': TRAILING_STOP_ACTIVATION,
+    'TRAILING_STOP_MIN_MOVE': TRAILING_STOP_MIN_MOVE,
     'MARKET_OPEN': MARKET_OPEN,
     'MARKET_CLOSE': MARKET_CLOSE,
     'MOMENTUM_THRESHOLD': MOMENTUM_THRESHOLD,
     'RSI_OVERSOLD': RSI_OVERSOLD,
     'RSI_OVERBOUGHT': RSI_OVERBOUGHT,
     'VOLUME_MULTIPLIER': VOLUME_MULTIPLIER,
+    'MIN_CONFIDENCE_THRESHOLD': MIN_CONFIDENCE_THRESHOLD,
+    'MIN_CONFIDENCE_DEMO': MIN_CONFIDENCE_DEMO,
     'ALPACA_BASE_URL': ALPACA_BASE_URL,
     'ALPACA_API_KEY': ALPACA_API_KEY,
     'ALPACA_SECRET_KEY': ALPACA_SECRET_KEY,
