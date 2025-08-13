@@ -1,0 +1,659 @@
+#!/usr/bin/env python3
+"""
+⚡ Scalping Bot Launcher
+Main entry point for the 1-5 minute scalping system
+"""
+
+import sys
+import time
+import signal
+from pathlib import Path
+from datetime import datetime, timedelta
+import argparse
+import pytz
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent))
+
+from config import config, validate_config, TIMEFRAME_CONFIGS
+from core.scalping_engine import ScalpingEngine
+from utils.logger import setup_scalping_loggers
+
+class ScalpingBotLauncher:
+    """Main launcher for the scalping bot system"""
+    
+    def __init__(self):
+        """Initialize the launcher"""
+        self.engine = None
+        self.loggers = setup_scalping_loggers()
+        self.main_logger = self.loggers['scalping_engine']
+        self.signal_count = 0  # Track number of signals received
+        self.last_signal_time = 0
+        
+        # Set up signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+    
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals - require multiple signals to prevent spurious shutdowns"""
+        import time
+        current_time = time.time()
+        
+        # Reset signal count if more than 30 seconds have passed since last signal
+        if current_time - self.last_signal_time > 30:
+            self.signal_count = 0
+        
+        self.signal_count += 1
+        self.last_signal_time = current_time
+        
+        if self.signal_count == 1:
+            self.main_logger.warning(f"⚠️ Received signal {signum} (count: {self.signal_count}) - This may be spurious. Send again within 30s to shutdown.")
+            return
+        elif self.signal_count == 2:
+            self.main_logger.info(f"🛑 Received signal {signum} (count: {self.signal_count}) - Shutting down gracefully...")
+            if self.engine:
+                # Show end-of-day P&L before stopping
+                try:
+                    self.get_end_of_day_pnl()
+                except Exception as e:
+                    self.main_logger.error(f"Error getting end-of-day P&L: {e}")
+                self.engine.stop()
+            sys.exit(0)
+        else:
+            self.main_logger.info(f"🛑 Multiple signals received ({self.signal_count}) - Force shutdown...")
+            sys.exit(0)
+    
+    def get_market_status(self) -> dict:
+        """Get current market status"""
+        try:
+            # Get current time in Eastern Time
+            et_timezone = pytz.timezone('US/Eastern')
+            now_et = datetime.now(et_timezone)
+            
+            # Check if it's a weekday (Monday=0, Sunday=6)
+            is_weekday = now_et.weekday() < 5
+            
+            # Parse market hours
+            market_open_time = datetime.strptime(config.MARKET_OPEN, "%H:%M").time()
+            market_close_time = datetime.strptime(config.MARKET_CLOSE, "%H:%M").time()
+            scalp_start_time = datetime.strptime(config.SCALP_START, "%H:%M").time()
+            scalp_end_time = datetime.strptime(config.SCALP_END, "%H:%M").time()
+            
+            # Get current time components
+            current_time = now_et.time()
+            
+            # Market status checks
+            is_market_open = market_open_time <= current_time <= market_close_time
+            is_scalping_hours = scalp_start_time <= current_time <= scalp_end_time
+            
+            # Calculate next market open
+            next_market_open = None
+            if not is_weekday:
+                # Next Monday
+                days_until_monday = (7 - now_et.weekday()) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 7
+                next_market_open = now_et.replace(hour=int(config.MARKET_OPEN.split(':')[0]), 
+                                                minute=int(config.MARKET_OPEN.split(':')[1]), 
+                                                second=0, microsecond=0) + timedelta(days=days_until_monday)
+            elif current_time < market_open_time:
+                # Today before market open
+                next_market_open = now_et.replace(hour=int(config.MARKET_OPEN.split(':')[0]), 
+                                                minute=int(config.MARKET_OPEN.split(':')[1]), 
+                                                second=0, microsecond=0)
+            elif current_time > market_close_time:
+                # Today after market close, next trading day
+                if now_et.weekday() == 4:  # Friday
+                    next_market_open = now_et.replace(hour=int(config.MARKET_OPEN.split(':')[0]), 
+                                                    minute=int(config.MARKET_OPEN.split(':')[1]), 
+                                                    second=0, microsecond=0) + timedelta(days=3)
+                else:
+                    next_market_open = now_et.replace(hour=int(config.MARKET_OPEN.split(':')[0]), 
+                                                    minute=int(config.MARKET_OPEN.split(':')[1]), 
+                                                    second=0, microsecond=0) + timedelta(days=1)
+            
+            return {
+                'current_time_et': now_et,
+                'is_weekday': is_weekday,
+                'is_market_open': is_market_open,
+                'is_scalping_hours': is_scalping_hours,
+                'next_market_open': next_market_open,
+                'market_open_time': f"{config.MARKET_OPEN}:00 ET",
+                'market_close_time': f"{config.MARKET_CLOSE}:00 ET",
+                'scalp_start_time': f"{config.SCALP_START}:00 ET",
+                'scalp_end_time': f"{config.SCALP_END}:00 ET"
+            }
+            
+        except Exception as e:
+            self.main_logger.error(f"❌ Error getting market status: {e}")
+            return {}
+    
+    def wait_for_market_open(self):
+        """Wait for market to open if currently closed"""
+        market_status = self.get_market_status()
+        
+        if not market_status:
+            self.main_logger.warning("⚠️ Could not determine market status, proceeding...")
+            return
+        
+        current_time = market_status['current_time_et']
+        next_open = market_status['next_market_open']
+        
+        print(f"\n🕐 Current Time: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        print(f"📅 Market Open: {market_status['market_open_time']}")
+        print(f"📅 Market Close: {market_status['market_close_time']}")
+        print(f"⏰ Scalping Hours: {market_status['scalp_start_time']} - {market_status['scalp_end_time']}")
+        
+        if not market_status['is_weekday']:
+            print(f"🛌 Market is closed (Weekend)")
+            if next_open:
+                wait_time = (next_open - current_time).total_seconds()
+                print(f"⏰ Next market open: {next_open.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                print(f"😴 Sleeping for {wait_time/3600:.1f} hours until market opens...")
+                self._sleep_with_progress(wait_time, "market open")
+        
+        elif not market_status['is_market_open']:
+            if current_time.time() < datetime.strptime(config.MARKET_OPEN, "%H:%M").time():
+                # Before market open today
+                print(f"🌅 Market opens in a few hours")
+                if next_open:
+                    wait_time = (next_open - current_time).total_seconds()
+                    print(f"⏰ Market opens at: {next_open.strftime('%H:%M:%S %Z')}")
+                    print(f"😴 Sleeping for {wait_time/60:.0f} minutes until market opens...")
+                    self._sleep_with_progress(wait_time, "market open")
+            else:
+                # After market close today
+                print(f"🌙 Market is closed for the day")
+                if next_open:
+                    wait_time = (next_open - current_time).total_seconds()
+                    print(f"⏰ Next market open: {next_open.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                    print(f"😴 Sleeping for {wait_time/3600:.1f} hours until next market open...")
+                    self._sleep_with_progress(wait_time, "next market open")
+        
+        elif not market_status['is_scalping_hours']:
+            if current_time.time() < datetime.strptime(config.SCALP_START, "%H:%M").time():
+                # Market is open but before scalping hours
+                scalp_start_today = current_time.replace(
+                    hour=int(config.SCALP_START.split(':')[0]), 
+                    minute=int(config.SCALP_START.split(':')[1]), 
+                    second=0, microsecond=0
+                )
+                wait_time = (scalp_start_today - current_time).total_seconds()
+                print(f"⏰ Market is open, but scalping starts at {config.SCALP_START}:00 ET")
+                print(f"😴 Sleeping for {wait_time/60:.0f} minutes until scalping hours...")
+                self._sleep_with_progress(wait_time, "scalping hours")
+            else:
+                # After scalping hours
+                print(f"🛑 Scalping hours ended at {config.SCALP_END}:00 ET")
+                print(f"📊 Market is still open for position management only")
+        else:
+            print(f"✅ Market is open and in scalping hours!")
+    
+    def _sleep_with_progress(self, total_seconds: float, wait_reason: str):
+        """Sleep with progress updates showing real-time countdown on a single line"""
+        try:
+            et_timezone = pytz.timezone('US/Eastern')
+            start_time = time.time()
+            
+            print(f"\n💤 Waiting for {wait_reason}...")
+            
+            while time.time() - start_time < total_seconds:
+                # Get current time in ET
+                current_et = datetime.now(et_timezone)
+                
+                # Calculate remaining time
+                elapsed = time.time() - start_time
+                remaining = total_seconds - elapsed
+                
+                # Format remaining time as HH:MM:SS
+                remaining_hours = int(remaining // 3600)
+                remaining_minutes = int((remaining % 3600) // 60)
+                remaining_seconds = int(remaining % 60)
+                
+                # Format current time (shorter format)
+                current_time_str = current_et.strftime('%H:%M:%S')
+                
+                # Create countdown string
+                countdown_str = f"{remaining_hours:02d}:{remaining_minutes:02d}:{remaining_seconds:02d}"
+                
+                # Progress percentage
+                progress_percent = ((total_seconds - remaining) / total_seconds) * 100
+                
+                # Single line status with carriage return to overwrite
+                status_line = f"🕐 Current Time: {current_time_str} ET | ⏳ Market Opens In: {countdown_str} | 📈 {progress_percent:.1f}%"
+                
+                print(f"\r{status_line}", end='', flush=True)
+                
+                # Sleep for 1 second for smooth updates
+                time.sleep(1)
+            
+            print(f"\n⏰ {wait_reason} reached!")
+            
+        except KeyboardInterrupt:
+            print(f"\n⏹️ Sleep interrupted by user")
+            raise
+    
+    def _validate_environment(self) -> bool:
+        """Validate environment and configuration"""
+        try:
+            self.main_logger.info("🔍 Validating environment...")
+            
+            # Check configuration
+            if not validate_config():
+                self.main_logger.error("❌ Configuration validation failed")
+                return False
+            
+            # Check required packages
+            required_packages = ['pandas', 'numpy', 'alpaca']
+            missing_packages = []
+            
+            for package in required_packages:
+                try:
+                    __import__(package)
+                except ImportError:
+                    missing_packages.append(package)
+            
+            if missing_packages:
+                self.main_logger.error(f"❌ Missing required packages: {missing_packages}")
+                return False
+            
+            # Check market hours if running live
+            if config.ALPACA_BASE_URL != "https://paper-api.alpaca.markets":
+                from core.data_manager import DataManager
+                dm = DataManager()
+                market_status = dm.get_market_hours_status()
+                
+                if not market_status.get('is_weekday'):
+                    self.main_logger.warning("⚠️ Market is closed (weekend)")
+                
+                if not market_status.get('is_market_hours'):
+                    self.main_logger.warning("⚠️ Outside market hours")
+            
+            self.main_logger.info("✅ Environment validation passed")
+            return True
+            
+        except Exception as e:
+            self.main_logger.error(f"❌ Environment validation error: {e}")
+            return False
+    
+    def print_startup_banner(self):
+        """Print startup information"""
+        print("\n" + "="*60)
+        print("⚡ SCALPING BOT - HIGH FREQUENCY TRADING SYSTEM")
+        print("="*60)
+        print(f"🕐 Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"📊 Timeframe: {config.TIMEFRAME}")
+        print(f"💰 Max Daily Loss: {config.MAX_DAILY_LOSS_PCT}% of portfolio")
+        print(f"📈 Max Positions: {config.MAX_OPEN_POSITIONS}")
+        print(f"🎯 Risk per Trade: {config.ACCOUNT_RISK_PCT}%")
+        print(f"🛑 Stop Loss: {config.STOP_LOSS_PCT}%")
+        print(f"💎 Profit Target: {config.PROFIT_TARGET_PCT}%")
+        print(f"📋 Watchlist: {len(config.SCALPING_WATCHLIST)} symbols")
+        print(f"🔗 Broker: {'Paper Trading' if 'paper' in config.ALPACA_BASE_URL else 'Live Trading'}")
+        if config.SIMULATE_PORTFOLIO:
+            print(f"🧪 Portfolio: Simulated ${config.SIMULATED_PORTFOLIO_VALUE:,.0f} (not using full account)")
+        if config.ALLOW_SHORT_SELLING:
+            print(f"📉 Short Selling: Enabled (Max exposure: ${config.MAX_SHORT_EXPOSURE:,.0f})")
+        else:
+            print(f"📉 Short Selling: Disabled (Long positions only)")
+        print("="*60)
+        
+        # Show strategies
+        print("🎯 ACTIVE STRATEGIES:")
+        print("   • Momentum Scalping - Captures short-term momentum moves")
+        print("   • Mean Reversion - Trades oversold/overbought conditions")
+        print("   • VWAP Bounce - Trades bounces off volume-weighted average price")
+        print("="*60)
+        
+        # Show timeframe configuration
+        timeframe_config = TIMEFRAME_CONFIGS.get(config.TIMEFRAME, {})
+        print(f"⏱️ TIMEFRAME SETTINGS ({config.TIMEFRAME}):")
+        print(f"   • Lookback Periods: {timeframe_config.get('lookback_periods', 'N/A')}")
+        print(f"   • Signal Delay: {timeframe_config.get('signal_delay', 'N/A')}s")
+        print(f"   • Max Hold Time: {timeframe_config.get('max_hold_time', 'N/A')}s")
+        print(f"   • Momentum Threshold: {timeframe_config.get('momentum_threshold', 'N/A')}%")
+        print("="*60)
+        
+        # Show risk warnings
+        print("⚠️ RISK WARNINGS:")
+        print("   • Scalping involves high frequency trading with significant risk")
+        print("   • Past performance does not guarantee future results")
+        print("   • Monitor positions closely and respect risk limits")
+        print("   • This is automated trading - supervise the system")
+        print("="*60)
+        
+        if 'paper' in config.ALPACA_BASE_URL:
+            print("📝 PAPER TRADING MODE - No real money at risk")
+        else:
+            print("💸 LIVE TRADING MODE - Real money at risk!")
+        
+        print("="*60)
+        print("💡 TIP: Use --dashboard for clean, non-scrolling interface")
+        print("="*60)
+    
+    def run_pre_market_check(self):
+        """Run pre-market checks and setup"""
+        try:
+            self.main_logger.info("🔍 Running pre-market checks...")
+            
+            # Check connection to broker
+            from core.data_manager import DataManager
+            dm = DataManager()
+            
+            # Test data connection
+            test_data = dm.get_current_market_data("SPY")
+            if test_data:
+                self.main_logger.info(f"✅ Data connection OK - SPY: ${test_data['price']:.2f}")
+            else:
+                self.main_logger.warning("⚠️ Could not get test market data")
+            
+            # Test order connection
+            from core.order_manager import OrderManager
+            om = OrderManager()
+            if not om.initialize_trading():
+                self.main_logger.warning("⚠️ Could not initialize order manager connection")
+            else:
+                self.main_logger.info("✅ Order manager initialized")
+            
+            # Check account status
+            if hasattr(om, 'alpaca_trader') and om.alpaca_trader:
+                try:
+                    account = om.alpaca_trader.get_account_info_simple()
+                    if account:
+                        if config.SIMULATE_PORTFOLIO:
+                            self.main_logger.info(f"🏦 Real account equity: ${account.get('portfolio_value', 0):,.2f}")
+                            self.main_logger.info(f"🧪 Simulated equity: ${config.SIMULATED_PORTFOLIO_VALUE:,.2f}")
+                            self.main_logger.info(f"💵 Real buying power: ${account.get('buying_power', 0):,.2f}")
+                        else:
+                            self.main_logger.info(f"💰 Account equity: ${account.get('portfolio_value', 0):,.2f}")
+                            self.main_logger.info(f"💵 Buying power: ${account.get('buying_power', 0):,.2f}")
+                except Exception as e:
+                    self.main_logger.warning(f"⚠️ Could not get account info: {e}")
+            
+            self.main_logger.info("✅ Pre-market checks complete")
+            
+        except Exception as e:
+            self.main_logger.error(f"❌ Pre-market check error: {e}")
+    
+    def run_scalping_bot(self, dry_run: bool = False):
+        """Run the main scalping bot"""
+        try:
+            self.main_logger.info("🚀 Starting scalping bot engine...")
+            
+            if dry_run:
+                self.main_logger.info("🧪 DRY RUN MODE - No actual trades will be executed")
+            
+            # Check market hours and wait if necessary
+            self.wait_for_market_open()
+            
+            # Initialize the intraday trading engine
+            self.engine = ScalpingEngine()
+            
+            # Start the engine
+            self.engine.start()
+            
+        except KeyboardInterrupt:
+            self.main_logger.info("👋 Shutdown requested by user")
+        except Exception as e:
+            self.main_logger.error(f"❌ Critical error in scalping bot: {e}")
+            raise
+        finally:
+            if self.engine:
+                # Show end-of-day P&L before stopping
+                try:
+                    self.get_end_of_day_pnl()
+                except Exception as e:
+                    self.main_logger.error(f"Error getting end-of-day P&L: {e}")
+                self.engine.stop()
+            self.main_logger.info("🛑 Scalping bot stopped")
+    
+    def run_strategy_test(self, symbol: str = "AAPL"):
+        """Run a test of all strategies on a single symbol"""
+        try:
+            self.main_logger.info(f"🧪 Testing strategies on {symbol}...")
+            
+            from core.data_manager import DataManager
+            from strategies.momentum_scalp import MomentumScalpStrategy
+            from strategies.mean_reversion import MeanReversionStrategy
+            from strategies.vwap_bounce import VWAPBounceStrategy
+            
+            # Get market data
+            dm = DataManager()
+            data = dm.get_market_data(symbol, config.TIMEFRAME, 100)
+            
+            if data is None or len(data) == 0:
+                self.main_logger.error(f"❌ Could not get data for {symbol}")
+                return
+            
+            self.main_logger.info(f"📊 Retrieved {len(data)} bars for {symbol}")
+            
+            # Test each strategy
+            strategies = {
+                'Momentum': MomentumScalpStrategy(),
+                'Mean Reversion': MeanReversionStrategy(),
+                'VWAP Bounce': VWAPBounceStrategy()
+            }
+            
+            total_signals = 0
+            
+            for name, strategy in strategies.items():
+                try:
+                    signals = strategy.generate_signals(symbol, data)
+                    total_signals += len(signals)
+                    
+                    self.main_logger.info(f"🎯 {name}: {len(signals)} signals")
+                    
+                    for signal in signals:
+                        self.main_logger.info(f"   • {signal.signal_type} @ ${signal.entry_price:.2f} "
+                                            f"(confidence: {signal.confidence:.2f})")
+                
+                except Exception as e:
+                    self.main_logger.error(f"❌ Error testing {name}: {e}")
+            
+            self.main_logger.info(f"✅ Strategy test complete - {total_signals} total signals")
+            
+        except Exception as e:
+            self.main_logger.error(f"❌ Strategy test error: {e}")
+
+    def get_end_of_day_pnl(self):
+        """Get end-of-day P&L summary for the stock scalping bot"""
+        try:
+            if not self.engine:
+                self.main_logger.warning("⚠️ Engine not available for P&L report")
+                return 0.0
+            
+            # Get live data from risk manager using actual Alpaca account
+            live_metrics = self.engine.risk_manager.get_live_pnl_metrics(
+                order_manager=self.engine.order_manager
+            )
+            
+            self.main_logger.info("📊 END OF DAY P&L REPORT:")
+            self.main_logger.info("=" * 50)
+            self.main_logger.info(f"📈 Daily P&L: ${live_metrics.get('daily_pnl', 0.0):.2f}")
+            self.main_logger.info(f"🎯 Total Trades: {live_metrics.get('daily_trades', 0)}")
+            self.main_logger.info(f"📍 Active Positions: {live_metrics.get('active_positions', 0)}")
+            self.main_logger.info(f"💰 Portfolio Value: ${live_metrics.get('account_equity', 0):,.2f}")
+            
+            # Show win rate if trades were made
+            if live_metrics.get('daily_trades', 0) > 0:
+                win_rate = live_metrics.get('win_rate', 0)
+                self.main_logger.info(f"� Win Rate: {win_rate:.1f}% ({live_metrics.get('profitable_symbols', 0)}/{live_metrics.get('total_symbols', 0)} symbols profitable)")
+            else:
+                self.main_logger.info(f"📈 Win Rate: N/A (no trades)")
+            
+            # Show portfolio risk
+            portfolio_risk = live_metrics.get('portfolio_risk_pct', 0.0)
+            self.main_logger.info(f"⚡ Portfolio Risk: {portfolio_risk:.2f}%")
+            
+            # Show symbols traded
+            symbols_traded = live_metrics.get('symbols_traded', [])
+            if symbols_traded:
+                self.main_logger.info(f"📋 Symbols Traded: {', '.join(symbols_traded)}")
+            
+            # Show data source
+            data_source = live_metrics.get('data_source', 'unknown')
+            if data_source == 'alpaca_live':
+                self.main_logger.info("✅ Data Source: Live Alpaca Account")
+            else:
+                self.main_logger.info("⚠️ Data Source: Internal Tracking (may not reflect actual trades)")
+            
+            # Show any open positions
+            if self.engine.active_positions:
+                self.main_logger.info("🔍 Bot-Tracked Open Positions:")
+                for symbol, position in self.engine.active_positions.items():
+                    side = position.get('side', 'UNKNOWN')
+                    quantity = position.get('quantity', 0)
+                    entry_price = position.get('entry_price', 0)
+                    current_price = position.get('current_price', entry_price)
+                    
+                    # Calculate unrealized P&L
+                    if side == 'LONG':
+                        unrealized_pnl = (current_price - entry_price) * quantity
+                    elif side == 'SHORT':
+                        unrealized_pnl = (entry_price - current_price) * quantity
+                    else:
+                        unrealized_pnl = 0
+                    
+                    self.main_logger.info(f"   {symbol}: {side} {quantity} @ ${entry_price:.2f} "
+                                        f"(Current: ${current_price:.2f}, P&L: ${unrealized_pnl:.2f})")
+            else:
+                self.main_logger.info("✅ No bot-tracked open positions")
+            
+            # Show position count vs limits
+            position_count = self.engine.risk_manager.position_count
+            max_positions = config.MAX_OPEN_POSITIONS
+            self.main_logger.info(f"📊 Position Usage: {position_count}/{max_positions}")
+            
+            # Show short exposure if applicable
+            if config.ALLOW_SHORT_SELLING:
+                short_exposure = self.engine.risk_manager.total_short_exposure
+                max_short = config.MAX_SHORT_EXPOSURE
+                self.main_logger.info(f"📉 Short Exposure: ${short_exposure:.2f}/${max_short:.2f}")
+            
+            self.main_logger.info("=" * 50)
+            
+            return live_metrics.get('daily_pnl', 0.0)
+            
+        except Exception as e:
+            self.main_logger.error(f"❌ Error generating end-of-day P&L report: {e}")
+            return 0.0
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description="Scalping Bot - High Frequency Trading System")
+    parser.add_argument("--timeframe", choices=["1Min", "2Min", "5Min"], 
+                       default="1Min", help="Trading timeframe")
+    parser.add_argument("--dry-run", action="store_true", 
+                       help="Run in dry-run mode (no actual trades)")
+    parser.add_argument("--test", metavar="SYMBOL", 
+                       help="Test strategies on a single symbol")
+    parser.add_argument("--validate-only", action="store_true",
+                       help="Only validate environment and exit")
+    parser.add_argument("--dashboard", action="store_true",
+                       help="Run with clean dashboard interface (no scrolling logs)")
+    parser.add_argument("--dashboard-interval", type=int, default=30,
+                       help="Seconds between dashboard refresh updates (default 10)")
+    parser.add_argument("--pnl-report", action="store_true",
+                       help="Show current P&L report and exit")
+    parser.add_argument("--comprehensive-report", metavar="DATE", nargs="?", const="today",
+                       help="Generate comprehensive P&L report with graphs (optional: YYYY-MM-DD)")
+    parser.add_argument("--report-path", metavar="PATH", 
+                       help="Custom save path for comprehensive report files")
+    
+    args = parser.parse_args()
+    
+    # Set timeframe from command line
+    if args.timeframe:
+        config.TIMEFRAME = args.timeframe
+    
+    # Handle dashboard mode
+    if args.dashboard:
+        try:
+            from live_dashboard import live_dashboard
+            interval = max(2, args.dashboard_interval)
+            print(f"🖥️ Starting Live Dashboard & Engine (refresh {interval}s)...")
+            live_dashboard(update_interval=interval)
+        except Exception as e:
+            print(f"❌ Failed to start live dashboard: {e}")
+        return
+    
+    # Create launcher
+    launcher = ScalpingBotLauncher()
+    
+    # Print startup banner
+    launcher.print_startup_banner()
+    
+    # Validate environment
+    if not launcher._validate_environment():
+        print("❌ Environment validation failed")
+        sys.exit(1)
+    
+    if args.validate_only:
+        print("✅ Environment validation successful")
+        sys.exit(0)
+    
+    # Handle P&L report request
+    if args.pnl_report:
+        print("📊 Getting current P&L report...")
+        try:
+            # Create a temporary engine instance to get P&L data
+            engine = ScalpingEngine()
+            launcher.engine = engine  # Set engine so get_end_of_day_pnl can access it
+            launcher.get_end_of_day_pnl()
+        except Exception as e:
+            print(f"❌ Error getting P&L report: {e}")
+        sys.exit(0)
+    
+    # Handle comprehensive report request
+    if args.comprehensive_report:
+        print("📊 Generating comprehensive P&L report with graphs...")
+        try:
+            from comprehensive_pnl_report import ComprehensivePnLReporter
+            
+            # Determine target date
+            if args.comprehensive_report == "today":
+                import pytz
+                et_timezone = pytz.timezone('US/Eastern')
+                target_date = datetime.now(et_timezone).strftime('%Y-%m-%d')
+            else:
+                target_date = args.comprehensive_report
+            
+            # Create reporter and generate report
+            reporter = ComprehensivePnLReporter()
+            report = reporter.generate_comprehensive_report(
+                target_date=target_date,
+                save_path=args.report_path
+            )
+            
+            if report and report['summary']['total_trades'] > 0:
+                print(f"\n✅ Comprehensive report generated successfully!")
+                print(f"📊 Charts and data saved to reports/ directory")
+                print(f"📈 Total P&L: ${report['summary']['total_pnl']:.2f}")
+                print(f"🎯 Total Trades: {report['summary']['total_trades']}")
+                print(f"📊 Win Rate: {report.get('round_trip_analysis', {}).get('win_rate', 0):.1f}%")
+            else:
+                print(f"\n📭 No trading activity found for {target_date}")
+                
+        except ImportError:
+            print("❌ Comprehensive reporting module not available")
+            print("💡 Run: pip install matplotlib seaborn")
+        except Exception as e:
+            print(f"❌ Error generating comprehensive report: {e}")
+            import traceback
+            traceback.print_exc()
+        sys.exit(0)
+    
+    # Run pre-market checks
+    launcher.run_pre_market_check()
+    
+    # Handle different run modes
+    if args.test:
+        launcher.run_strategy_test(args.test)
+    else:
+        print(f"\n🚀 Starting scalping bot in {'DRY RUN' if args.dry_run else 'LIVE'} mode...")
+        print("Press Ctrl+C to stop\n")
+        
+        launcher.run_scalping_bot(dry_run=args.dry_run)
+
+if __name__ == "__main__":
+    main()

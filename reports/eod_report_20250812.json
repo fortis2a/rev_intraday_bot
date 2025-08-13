@@ -1,0 +1,122 @@
+{
+  "date": "2025-08-12",
+  "total_trades": 11,
+  "winning_trades": 8,
+  "losing_trades": 2,
+  "win_rate": 72.72727272727273,
+  "total_pnl": 40.26,
+  "average_win": 5.49625,
+  "average_loss": -1.855,
+  "symbol_performance": {
+    "PG": {
+      "pnl": 34.41,
+      "trades": 3
+    },
+    "QBTS": {
+      "pnl": 0.65,
+      "trades": 2
+    },
+    "JNJ": {
+      "pnl": 2.1,
+      "trades": 3
+    },
+    "IONQ": {
+      "pnl": 1.45,
+      "trades": 2
+    },
+    "RGTI": {
+      "pnl": 1.65,
+      "trades": 1
+    }
+  },
+  "trades": [
+    {
+      "time": "13:48:12",
+      "symbol": "PG",
+      "shares": 5.0,
+      "exit_price": 156.39,
+      "realized_pnl": 7.8,
+      "daily_pnl": 7.8
+    },
+    {
+      "time": "14:22:36",
+      "symbol": "QBTS",
+      "shares": 10.0,
+      "exit_price": 17.74,
+      "realized_pnl": -0.35,
+      "daily_pnl": -0.35
+    },
+    {
+      "time": "14:28:50",
+      "symbol": "JNJ",
+      "shares": 4.0,
+      "exit_price": 173.27,
+      "realized_pnl": 2.84,
+      "daily_pnl": 2.49
+    },
+    {
+      "time": "14:33:39",
+      "symbol": "PG",
+      "shares": 5.0,
+      "exit_price": 157.3,
+      "realized_pnl": 13.33,
+      "daily_pnl": 13.33
+    },
+    {
+      "time": "14:34:01",
+      "symbol": "JNJ",
+      "shares": 4.0,
+      "exit_price": 173.32,
+      "realized_pnl": 2.62,
+      "daily_pnl": 15.95
+    },
+    {
+      "time": "14:34:25",
+      "symbol": "IONQ",
+      "shares": 10.0,
+      "exit_price": 43.3,
+      "realized_pnl": 0.0,
+      "daily_pnl": 15.95
+    },
+    {
+      "time": "15:06:10",
+      "symbol": "RGTI",
+      "shares": 10.0,
+      "exit_price": 16.23,
+      "realized_pnl": 1.65,
+      "daily_pnl": 1.65
+    },
+    {
+      "time": "15:06:10",
+      "symbol": "QBTS",
+      "shares": 10.0,
+      "exit_price": 18.1,
+      "realized_pnl": 1.0,
+      "daily_pnl": 2.65
+    },
+    {
+      "time": "15:06:28",
+      "symbol": "PG",
+      "shares": 5.0,
+      "exit_price": 157.36,
+      "realized_pnl": 13.28,
+      "daily_pnl": 15.93
+    },
+    {
+      "time": "15:06:44",
+      "symbol": "JNJ",
+      "shares": 4.0,
+      "exit_price": 173.22,
+      "realized_pnl": -3.36,
+      "daily_pnl": 12.57
+    },
+    {
+      "time": "15:07:32",
+      "symbol": "IONQ",
+      "shares": 10.0,
+      "exit_price": 42.92,
+      "realized_pnl": 1.45,
+      "daily_pnl": 14.02
+    }
+  ]
+}

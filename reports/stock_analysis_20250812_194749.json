@@ -1,0 +1,278 @@
+{
+  "IONQ": {
+    "5D": {
+      "current_price": 43.0,
+      "start_price": 43.0,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 272898,
+      "recent_volume": 272898,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 5.2,
+      "trend_direction": "Neutral",
+      "support_level": 42.65,
+      "resistance_level": 44.88,
+      "days_analyzed": 2
+    },
+    "30D": {
+      "current_price": 43.0,
+      "start_price": 43.0,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 272898,
+      "recent_volume": 272898,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 5.2,
+      "trend_direction": "Neutral",
+      "support_level": 42.65,
+      "resistance_level": 44.88,
+      "days_analyzed": 2
+    },
+    "90D": {
+      "current_price": 43.0,
+      "start_price": 43.0,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 272898,
+      "recent_volume": 272898,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 5.2,
+      "trend_direction": "Neutral",
+      "support_level": 42.65,
+      "resistance_level": 44.88,
+      "days_analyzed": 2
+    },
+    "trading_analysis": {
+      "best_strategy": "day_trading",
+      "strategy_score": 0,
+      "risk_level": "Low",
+      "day_trading_score": 0,
+      "swing_trading_score": 0,
+      "position_trading_score": 0,
+      "recommendation": "Moderate opportunity - Wait for better setup"
+    }
+  },
+  "PG": {
+    "5D": {
+      "current_price": 155.16,
+      "start_price": 155.16,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 148484,
+      "recent_volume": 148484,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 0.79,
+      "trend_direction": "Neutral",
+      "support_level": 154.32,
+      "resistance_level": 155.54,
+      "days_analyzed": 2
+    },
+    "30D": {
+      "current_price": 155.16,
+      "start_price": 155.16,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 148484,
+      "recent_volume": 148484,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 0.79,
+      "trend_direction": "Neutral",
+      "support_level": 154.32,
+      "resistance_level": 155.54,
+      "days_analyzed": 2
+    },
+    "90D": {
+      "current_price": 155.16,
+      "start_price": 155.16,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 148484,
+      "recent_volume": 148484,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 0.79,
+      "trend_direction": "Neutral",
+      "support_level": 154.32,
+      "resistance_level": 155.54,
+      "days_analyzed": 2
+    },
+    "trading_analysis": {
+      "best_strategy": "day_trading",
+      "strategy_score": 0,
+      "risk_level": "Low",
+      "day_trading_score": 0,
+      "swing_trading_score": 0,
+      "position_trading_score": 0,
+      "recommendation": "Hold for stability - Low volatility environment"
+    }
+  },
+  "QBTS": {
+    "5D": {
+      "current_price": 18.51,
+      "start_price": 18.51,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 546167,
+      "recent_volume": 546167,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 8.86,
+      "trend_direction": "Neutral",
+      "support_level": 16.94,
+      "resistance_level": 18.58,
+      "days_analyzed": 2
+    },
+    "30D": {
+      "current_price": 18.51,
+      "start_price": 18.51,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 546167,
+      "recent_volume": 546167,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 8.86,
+      "trend_direction": "Neutral",
+      "support_level": 16.94,
+      "resistance_level": 18.58,
+      "days_analyzed": 2
+    },
+    "90D": {
+      "current_price": 18.51,
+      "start_price": 18.51,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 546167,
+      "recent_volume": 546167,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 8.86,
+      "trend_direction": "Neutral",
+      "support_level": 16.94,
+      "resistance_level": 18.58,
+      "days_analyzed": 2
+    },
+    "trading_analysis": {
+      "best_strategy": "day_trading",
+      "strategy_score": 0,
+      "risk_level": "Low",
+      "day_trading_score": 0,
+      "swing_trading_score": 0,
+      "position_trading_score": 0,
+      "recommendation": "Moderate opportunity - Wait for better setup"
+    }
+  },
+  "RGTI": {
+    "5D": {
+      "current_price": 16.21,
+      "start_price": 16.21,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 298873,
+      "recent_volume": 298873,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 5.37,
+      "trend_direction": "Neutral",
+      "support_level": 15.5,
+      "resistance_level": 16.37,
+      "days_analyzed": 2
+    },
+    "30D": {
+      "current_price": 16.21,
+      "start_price": 16.21,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 298873,
+      "recent_volume": 298873,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 5.37,
+      "trend_direction": "Neutral",
+      "support_level": 15.5,
+      "resistance_level": 16.37,
+      "days_analyzed": 2
+    },
+    "90D": {
+      "current_price": 16.21,
+      "start_price": 16.21,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 298873,
+      "recent_volume": 298873,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 5.37,
+      "trend_direction": "Neutral",
+      "support_level": 15.5,
+      "resistance_level": 16.37,
+      "days_analyzed": 2
+    },
+    "trading_analysis": {
+      "best_strategy": "day_trading",
+      "strategy_score": 0,
+      "risk_level": "Low",
+      "day_trading_score": 0,
+      "swing_trading_score": 0,
+      "position_trading_score": 0,
+      "recommendation": "Moderate opportunity - Wait for better setup"
+    }
+  },
+  "JNJ": {
+    "5D": {
+      "current_price": 172.78,
+      "start_price": 172.78,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 106968,
+      "recent_volume": 106968,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 1.7,
+      "trend_direction": "Neutral",
+      "support_level": 171.81,
+      "resistance_level": 174.74,
+      "days_analyzed": 2
+    },
+    "30D": {
+      "current_price": 172.78,
+      "start_price": 172.78,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 106968,
+      "recent_volume": 106968,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 1.7,
+      "trend_direction": "Neutral",
+      "support_level": 171.81,
+      "resistance_level": 174.74,
+      "days_analyzed": 2
+    },
+    "90D": {
+      "current_price": 172.78,
+      "start_price": 172.78,
+      "total_return_pct": 0.0,
+      "volatility_pct": NaN,
+      "avg_volume": 106968,
+      "recent_volume": 106968,
+      "volume_trend_pct": 0.0,
+      "price_range_pct": 1.7,
+      "trend_direction": "Neutral",
+      "support_level": 171.81,
+      "resistance_level": 174.74,
+      "days_analyzed": 2
+    },
+    "trading_analysis": {
+      "best_strategy": "day_trading",
+      "strategy_score": 0,
+      "risk_level": "Low",
+      "day_trading_score": 0,
+      "swing_trading_score": 0,
+      "position_trading_score": 0,
+      "recommendation": "Hold for stability - Low volatility environment"
+    }
+  },
+  "metadata": {
+    "timestamp": "2025-08-12T19:47:49.113141",
+    "watchlist": [
+      "IONQ",
+      "PG",
+      "QBTS",
+      "RGTI",
+      "JNJ"
+    ],
+    "analysis_type": "comprehensive_performance"
+  }
+}

@@ -1,0 +1,1 @@
+# Scalping Bot Trading Strategies
