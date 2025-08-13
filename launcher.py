@@ -454,15 +454,16 @@ class TradingSystemOrchestrator:
             print("4. Start Live P&L Monitor Only")
             print("5. 🧪 Test Mode (Bypass Market Hours)")
             print("6. 🕐 Show Market Status & Countdown")
-            print("7. Stop Trading Session")
-            print("8. Restart Component")
-            print("9. Generate P&L Report")
-            print("10. Generate EOD Report")
-            print("11. View Live Dashboard")
-            print("12. Validate Environment")
-            print("13. Exit")
+            print("7. 💾 Backup to GitHub")
+            print("8. Stop Trading Session")
+            print("9. Restart Component")
+            print("10. Generate P&L Report")
+            print("11. Generate EOD Report")
+            print("12. View Live Dashboard")
+            print("13. Validate Environment")
+            print("14. Exit")
             
-            choice = input("\nEnter your choice (1-13): ").strip()
+            choice = input("\nEnter your choice (1-14): ").strip()
             
             if choice == "1":
                 if not any(self.processes.values()):
@@ -509,30 +510,33 @@ class TradingSystemOrchestrator:
                     
             elif choice == "6":
                 self.show_market_status()
-                    
+                
             elif choice == "7":
+                self.backup_to_github()
+                    
+            elif choice == "8":
                 self.stop_trading_session()
                 
-            elif choice == "8":
+            elif choice == "9":
                 self.restart_component_menu()
                 
-            elif choice == "9":
+            elif choice == "10":
                 self.generate_pnl_report()
                 
-            elif choice == "10":
+            elif choice == "11":
                 self.generate_eod_report()
                 
-            elif choice == "11":
+            elif choice == "12":
                 self.launch_dashboard()
                 
-            elif choice == "12":
+            elif choice == "13":
                 print("🔍 Validating environment...")
                 if self.validate_environment(bypass_market_hours=True):
                     print("✅ Environment validation passed")
                 else:
                     print("❌ Environment validation failed")
                     
-            elif choice == "13":
+            elif choice == "14":
                 if any(self.processes.values()):
                     confirm = input("Trading session is running. Stop and exit? (y/N): ")
                     if confirm.lower() == 'y':
@@ -605,6 +609,35 @@ class TradingSystemOrchestrator:
                 
         except Exception as e:
             print(f"❌ Error: {e}")
+    
+    def backup_to_github(self):
+        """Manual backup to GitHub"""
+        try:
+            print("💾 Starting GitHub backup...")
+            
+            # Check if git repository exists
+            if not Path(".git").exists():
+                print("❌ No git repository found. Please run setup_github.ps1 first.")
+                return
+            
+            # Run the backup script
+            backup_script = Path("backup_to_github.ps1")
+            if backup_script.exists():
+                result = subprocess.run([
+                    "powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(backup_script)
+                ], capture_output=True, text=True, timeout=120)
+                
+                if result.returncode == 0:
+                    print("✅ GitHub backup completed successfully!")
+                    print(result.stdout)
+                else:
+                    print("❌ Backup failed:")
+                    print(result.stderr)
+            else:
+                print("❌ Backup script not found. Please run setup_github.ps1 first.")
+                
+        except Exception as e:
+            print(f"❌ Error during backup: {e}")
     
     def show_market_status(self):
         """Display current market status and countdown to next open"""
