@@ -2525,8 +2525,8 @@ class IntradayEngine:
             
             # Initialize components
             self.data_manager = DataManager()
-            self.risk_manager = RiskManager(self.data_manager)
-            self.order_manager = OrderManager(self.data_manager)
+            self.risk_manager = RiskManager()
+            self.order_manager = OrderManager()
             
             # Start the main trading loop
             self.start()

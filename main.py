@@ -66,7 +66,7 @@ def main():
             symbols = [s.strip().upper() for s in args.symbols.split(',')]
             logger.info(f"Trading symbols: {symbols}")
         else:
-            symbols = config.SYMBOLS
+            symbols = config.SCALPING_WATCHLIST
             logger.info(f"Using default symbols: {symbols}")
         
         # Start trading
