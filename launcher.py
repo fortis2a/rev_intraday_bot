@@ -1,750 +1,621 @@
 #!/usr/bin/env python3
 """
-🚀 Intraday Trading System Launcher/Orchestrator
-Intelligent agent that manages and coordinates all trading system components
+Intraday Trading Bot Launcher
+ASCII-only, no Unicode characters
 """
 
-import sys
-import time
-import threading
 import subprocess
+import time
+import os
 import signal
-import argparse
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
-import pytz
-import logging
-from typing import Dict, List, Optional
-import json
+from logger import setup_logger
 
-# Add parent directory to path
-sys.path.append(str(Path(__file__).parent))
-
-from config import config, validate_config
-from utils.logger import setup_logger
-
-class TradingSystemOrchestrator:
-    """Main orchestrator for the intraday trading system"""
+class TradingLauncher:
+    """Main launcher for the intraday trading system"""
     
     def __init__(self):
-        """Initialize the trading system orchestrator"""
-        self.logger = setup_logger("trading_orchestrator")
-        self.processes: Dict[str, subprocess.Popen] = {}
-        self.status: Dict[str, str] = {}
-        self.running = False
-        self.config = config
+        self.logger = setup_logger('trading_launcher')
+        self.processes = {}
+        self.python_cmd = 'python'
         
-        # Use virtual environment Python if available
-        venv_python = Path(__file__).parent / ".venv" / "Scripts" / "python.exe"
-        self.python_cmd = str(venv_python) if venv_python.exists() else sys.executable
+        # Create logs directory
+        Path('logs').mkdir(exist_ok=True)
         
-        # Component definitions
-        self.components = {
-            'main_bot': {
-                'script': 'main.py',
-                'description': 'Main intraday trading bot',
-                'critical': True,
-                'restart_on_failure': True,
-                'args': []
-            },
-            'dashboard': {
-                'script': 'main.py',
-                'description': 'Trading dashboard interface',
-                'critical': False,
-                'restart_on_failure': False,
-                'args': ['--dashboard']
-            },
-            'live_pnl': {
-                'script': 'live_pnl_monitor.py',
-                'description': 'Live P&L monitoring service',
-                'critical': False,
-                'restart_on_failure': True,
-                'args': ['--monitor']
-            },
-            'demo_bot': {
-                'script': 'demo.py',
-                'description': 'Demo trading bot (safe mode)',
-                'critical': False,
-                'restart_on_failure': False,
-                'args': []
-            },
-            'eod_report': {
-                'script': 'generate_eod_report.py',
-                'description': 'End-of-day report generator',
-                'critical': False,
-                'restart_on_failure': False,
-                'args': ['--auto']
-            }
+        self.logger.info("[INIT] Trading System Launcher initialized")
+    
+    def show_status(self):
+        """Show system status"""
+        print("\n" + "="*70)
+        print("           INTRADAY TRADING SYSTEM STATUS")
+        print("="*70)
+        
+        # Check if components are running
+        components = {
+            'Main Trading Engine': self.is_process_running('main_engine'),
+            'Live P&L Monitor': self.is_process_running('pnl_monitor'),
+            'Dashboard': self.is_process_running('dashboard')
         }
         
-        self.logger.info("🚀 Trading System Orchestrator initialized")
+        for name, status in components.items():
+            status_text = "RUNNING" if status else "STOPPED"
+            status_icon = "[ACTIVE]" if status else "[READY]"
+            print(f"{status_icon} {name:<25} {status_text}")
         
-    def validate_environment(self, bypass_market_hours: bool = False, auto_wait: bool = False) -> bool:
-        """Validate trading environment before starting"""
-        self.logger.info("🔍 Validating trading environment...")
+        print("="*70)
         
+        # Market status
         try:
-            # Validate configuration
-            validate_config()
-            
-            # Check market hours
-            if not bypass_market_hours:
-                if not self.is_market_hours():
-                    if auto_wait:
-                        # Automatically wait for market open
-                        if not self.wait_for_market_open():
-                            return False
-                    else:
-                        self.logger.warning("⚠️ Market is currently closed")
-                        return False
-            elif bypass_market_hours and not self.is_market_hours():
-                self.logger.info("⚠️ Market is closed but bypassing for testing")
-                
-            # Check required files exist
-            required_files = [
-                'main.py',
-                'config.py',
-                'core/intraday_engine.py'
-            ]
-            
-            for file_path in required_files:
-                if not Path(file_path).exists():
-                    self.logger.error(f"❌ Required file missing: {file_path}")
-                    return False
-                    
-            # Test API connectivity
-            self.logger.info("📡 Testing API connectivity...")
-            test_result = subprocess.run([
-                self.python_cmd, 'main.py', '--validate-only'
-            ], capture_output=True, text=True, timeout=30)
-            
-            if test_result.returncode != 0:
-                self.logger.error(f"❌ API validation failed: {test_result.stderr}")
-                return False
-                
-            self.logger.info("✅ Environment validation passed")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"❌ Environment validation failed: {e}")
-            return False
+            result = subprocess.run([self.python_cmd, '-c', 
+                'from data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
+                capture_output=True, text=True, timeout=10)
+            market_status = result.stdout.strip() if result.returncode == 0 else "UNKNOWN"
+        except:
+            market_status = "UNKNOWN"
+        
+        print(f"[{market_status}] Market Status: {market_status}")
+        print(f"[TIME] Current Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("="*70)
     
-    def is_market_hours(self) -> bool:
-        """Check if market is currently open"""
+    def show_account_info(self):
+        """Show Alpaca account information"""
         try:
-            est = pytz.timezone('US/Eastern')
-            now = datetime.now(est)
+            print("\n[ACCOUNT] Fetching account information...")
+            result = subprocess.run([
+                self.python_cmd, '-c',
+                'from data_manager import DataManager; dm = DataManager(); account = dm.get_account_info(); '
+                'print(f"Equity: ${account[\'equity\']:,.2f}") if account else print("Failed to get account info"); '
+                'print(f"Buying Power: ${account[\'buying_power\']:,.2f}") if account else None; '
+                'print(f"Cash: ${account[\'cash\']:,.2f}") if account else None'
+            ], capture_output=True, text=True, timeout=15)
             
-            # Skip weekends
-            if now.weekday() >= 5:  # Saturday = 5, Sunday = 6
-                return False
-                
-            # Market hours: 9:30 AM - 4:00 PM EST
-            market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-            market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
-            
-            return market_open <= now <= market_close
-            
-        except Exception as e:
-            self.logger.error(f"Error checking market hours: {e}")
-            return False
-    
-    def get_next_market_open(self) -> datetime:
-        """Get the next market open time"""
-        try:
-            est = pytz.timezone('US/Eastern')
-            now = datetime.now(est)
-            
-            # If it's a weekday and before 9:30 AM, market opens today
-            if now.weekday() < 5 and now.hour < 9 or (now.hour == 9 and now.minute < 30):
-                next_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+            if result.returncode == 0:
+                print("[SUCCESS] Account connected!")
+                print(result.stdout)
             else:
-                # Find next weekday
-                days_ahead = 1
-                next_day = now + timedelta(days=days_ahead)
+                print("[ERROR] Failed to get account info")
+                print(result.stderr)
                 
-                # Skip weekends
-                while next_day.weekday() >= 5:
-                    days_ahead += 1
-                    next_day = now + timedelta(days=days_ahead)
-                
-                next_open = next_day.replace(hour=9, minute=30, second=0, microsecond=0)
-            
-            return next_open
-            
         except Exception as e:
-            self.logger.error(f"Error calculating next market open: {e}")
-            # Default to tomorrow 9:30 AM
-            est = pytz.timezone('US/Eastern')
-            tomorrow = datetime.now(est) + timedelta(days=1)
-            return tomorrow.replace(hour=9, minute=30, second=0, microsecond=0)
+            print(f"[ERROR] Account check failed: {e}")
     
-    def wait_for_market_open(self):
-        """Wait for market to open with countdown display"""
-        if self.is_market_hours():
-            return  # Market is already open
-        
-        est = pytz.timezone('US/Eastern')
-        next_open = self.get_next_market_open()
-        
-        print("\n" + "="*60)
-        print("🕐 MARKET IS CURRENTLY CLOSED")
-        print("="*60)
-        print(f"📅 Current Time: {datetime.now(est).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        print(f"🚀 Next Market Open: {next_open.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        
-        # Calculate wait time
-        wait_seconds = (next_open - datetime.now(est)).total_seconds()
-        
-        if wait_seconds <= 0:
-            return  # Market should be open now
-        
-        hours = int(wait_seconds // 3600)
-        minutes = int((wait_seconds % 3600) // 60)
-        seconds = int(wait_seconds % 60)
-        
-        print(f"⏱️ Time Until Open: {hours:02d}:{minutes:02d}:{seconds:02d}")
-        print("="*60)
-        
-        # Ask user if they want to wait
-        if wait_seconds > 300:  # More than 5 minutes
-            print("\n🤔 Options:")
-            print("1. Wait for market open (automatic)")
-            print("2. Exit and return later")
-            print("3. Continue in test mode (bypass market hours)")
-            
-            choice = input("\nEnter your choice (1-3): ").strip()
-            
-            if choice == "2":
-                print("👋 Goodbye! Come back when markets are open.")
-                return False
-            elif choice == "3":
-                print("🧪 Continuing in test mode...")
+    def is_process_running(self, name):
+        """Check if a process is running"""
+        return name in self.processes and self.processes[name].poll() is None
+    
+    def start_main_engine(self, mode="LIVE"):
+        """Start the main trading engine"""
+        try:
+            if self.is_process_running('main_engine'):
+                print("[INFO] Main engine already running")
                 return True
-        
-        print(f"\n⏳ Waiting for market open... ({hours:02d}:{minutes:02d}:{seconds:02d} remaining)")
-        print("Press Ctrl+C to cancel")
-        
-        try:
-            # Show countdown every minute for long waits, every 10 seconds for short waits
-            update_interval = 60 if wait_seconds > 600 else 10
             
-            while not self.is_market_hours():
-                current_wait = (next_open - datetime.now(est)).total_seconds()
-                
-                if current_wait <= 0:
-                    break
-                
-                hours = int(current_wait // 3600)
-                minutes = int((current_wait % 3600) // 60)
-                seconds = int(current_wait % 60)
-                
-                print(f"\r⏳ Time until market open: {hours:02d}:{minutes:02d}:{seconds:02d}", end="", flush=True)
-                
-                # Sleep for update interval or remaining time, whichever is shorter
-                sleep_time = min(update_interval, current_wait)
-                time.sleep(sleep_time)
+            print(f"[START] Starting main trading engine in {mode} mode...")
+            self.logger.info(f"[START] Starting main trading engine in {mode} mode")
             
-            print(f"\n\n🎉 Market is now open! Starting trading session...")
-            return True
+            cmd = [self.python_cmd, 'main.py', '--mode', mode]
+            process = subprocess.Popen(cmd, 
+                                     stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE,
+                                     text=True)
             
-        except KeyboardInterrupt:
-            print(f"\n\n🛑 Wait cancelled by user")
-            return False
-    
-    def start_component(self, component_name: str, extra_args: List[str] = None) -> bool:
-        """Start a specific component"""
-        if component_name not in self.components:
-            self.logger.error(f"❌ Unknown component: {component_name}")
-            return False
-            
-        comp = self.components[component_name]
-        script_path = Path(comp['script'])
-        
-        if not script_path.exists():
-            self.logger.error(f"❌ Script not found: {script_path}")
-            return False
-            
-        # Build command
-        cmd = [self.python_cmd, str(script_path)]
-        cmd.extend(comp['args'])
-        if extra_args:
-            cmd.extend(extra_args)
-            
-        try:
-            self.logger.info(f"🚀 Starting {comp['description']}...")
-            
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
-            )
-            
-            self.processes[component_name] = process
-            self.status[component_name] = "running"
-            
-            self.logger.info(f"✅ {comp['description']} started (PID: {process.pid})")
+            self.processes['main_engine'] = process
+            print(f"[SUCCESS] Main engine started (PID: {process.pid})")
+            self.logger.info(f"[SUCCESS] Main engine started (PID: {process.pid})")
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to start {comp['description']}: {e}")
-            self.status[component_name] = "failed"
+            print(f"[ERROR] Failed to start main engine: {e}")
+            self.logger.error(f"[ERROR] Failed to start main engine: {e}")
             return False
     
-    def stop_component(self, component_name: str) -> bool:
-        """Stop a specific component"""
-        if component_name not in self.processes:
+    def start_pnl_monitor(self):
+        """Start P&L monitoring"""
+        try:
+            if self.is_process_running('pnl_monitor'):
+                print("[INFO] P&L monitor already running")
+                return True
+            
+            print("[START] Starting P&L monitor...")
+            self.logger.info("[START] Starting P&L monitor")
+            
+            # Create simple P&L monitor script
+            pnl_script = '''
+import time
+import sys
+sys.path.append(".")
+from data_manager import DataManager
+from logger import setup_logger
+
+logger = setup_logger("pnl_monitor")
+dm = DataManager()
+
+logger.info("[START] P&L Monitor started")
+
+while True:
+    try:
+        account = dm.get_account_info()
+        positions = dm.get_positions()
+        
+        if account:
+            total_unrealized = sum(p["unrealized_pl"] for p in positions)
+            logger.info(f"[PNL] Equity: ${account['equity']:,.2f}")
+            logger.info(f"[PNL] Unrealized P&L: ${total_unrealized:,.2f}")
+            logger.info(f"[PNL] Positions: {len(positions)}")
+            
+            if positions:
+                for pos in positions:
+                    logger.info(f"[POS] {pos['symbol']}: {pos['qty']} shares, P&L: ${pos['unrealized_pl']:,.2f}")
+        
+        time.sleep(30)  # Update every 30 seconds
+    except KeyboardInterrupt:
+        logger.info("[STOP] P&L Monitor stopped")
+        break
+    except Exception as e:
+        logger.error(f"[ERROR] P&L monitor error: {e}")
+        time.sleep(60)
+'''
+            
+            with open('pnl_monitor.py', 'w') as f:
+                f.write(pnl_script)
+            
+            cmd = [self.python_cmd, 'pnl_monitor.py']
+            process = subprocess.Popen(cmd,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE,
+                                     text=True)
+            
+            self.processes['pnl_monitor'] = process
+            print(f"[SUCCESS] P&L monitor started (PID: {process.pid})")
+            self.logger.info(f"[SUCCESS] P&L monitor started (PID: {process.pid})")
             return True
             
+        except Exception as e:
+            print(f"[ERROR] Failed to start P&L monitor: {e}")
+            self.logger.error(f"[ERROR] Failed to start P&L monitor: {e}")
+            return False
+    
+    def start_dashboard(self):
+        """Start dashboard mode"""
         try:
-            process = self.processes[component_name]
-            if process.poll() is None:  # Process is still running
-                self.logger.info(f"🛑 Stopping {component_name}...")
-                process.terminate()
-                
-                # Wait for graceful shutdown
-                try:
+            print("[START] Starting dashboard mode...")
+            self.logger.info("[START] Starting dashboard mode")
+            
+            cmd = [self.python_cmd, 'main.py', '--dashboard']
+            process = subprocess.Popen(cmd,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE,
+                                     text=True)
+            
+            self.processes['dashboard'] = process
+            print(f"[SUCCESS] Dashboard started (PID: {process.pid})")
+            self.logger.info(f"[SUCCESS] Dashboard started (PID: {process.pid})")
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to start dashboard: {e}")
+            self.logger.error(f"[ERROR] Failed to start dashboard: {e}")
+            return False
+    
+    def stop_process(self, name):
+        """Stop a specific process"""
+        try:
+            if name in self.processes:
+                process = self.processes[name]
+                if process.poll() is None:  # Still running
+                    process.terminate()
                     process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self.logger.warning(f"⚠️ Force killing {component_name}...")
-                    process.kill()
-                    process.wait()
-                    
-            del self.processes[component_name]
-            self.status[component_name] = "stopped"
-            
-            self.logger.info(f"✅ {component_name} stopped")
-            return True
-            
+                    print(f"[STOP] {name} stopped")
+                    self.logger.info(f"[STOP] {name} stopped")
+                del self.processes[name]
+                return True
         except Exception as e:
-            self.logger.error(f"❌ Error stopping {component_name}: {e}")
-            return False
+            print(f"[ERROR] Failed to stop {name}: {e}")
+            self.logger.error(f"[ERROR] Failed to stop {name}: {e}")
+        return False
     
-    def monitor_components(self):
-        """Monitor running components and restart if needed"""
-        while self.running:
-            try:
-                failed_components = []
-                
-                for name, process in list(self.processes.items()):
-                    if process.poll() is not None:  # Process has terminated
-                        exit_code = process.returncode
-                        comp = self.components[name]
-                        
-                        if exit_code != 0:
-                            self.logger.error(f"❌ {comp['description']} crashed (exit code: {exit_code})")
-                            failed_components.append(name)
-                        else:
-                            self.logger.info(f"ℹ️ {comp['description']} exited normally")
-                            
-                        del self.processes[name]
-                        self.status[name] = "failed" if exit_code != 0 else "stopped"
-                
-                # Restart failed critical components
-                for name in failed_components:
-                    comp = self.components[name]
-                    if comp['restart_on_failure'] and self.running:
-                        self.logger.info(f"🔄 Restarting {comp['description']}...")
-                        time.sleep(5)  # Brief delay before restart
-                        self.start_component(name)
-                
-                time.sleep(10)  # Check every 10 seconds
-                
-            except Exception as e:
-                self.logger.error(f"❌ Error in component monitoring: {e}")
-                time.sleep(10)
+    def stop_all(self):
+        """Stop all processes"""
+        print("[STOP] Stopping all processes...")
+        self.logger.info("[STOP] Stopping all processes")
+        
+        for name in list(self.processes.keys()):
+            self.stop_process(name)
+        
+        print("[STOP] All processes stopped")
+        self.logger.info("[STOP] All processes stopped")
     
-    def print_status(self):
-        """Print current status of all components"""
-        print("\n" + "="*60)
-        print("📊 TRADING SYSTEM STATUS")
-        print("="*60)
-        
-        for name, comp in self.components.items():
-            status = self.status.get(name, "not_started")
-            status_icon = {
-                "running": "🟢",
-                "stopped": "🔴", 
-                "failed": "❌",
-                "not_started": "⚪"
-            }.get(status, "❓")
-            
-            pid = ""
-            if name in self.processes and self.processes[name].poll() is None:
-                pid = f" (PID: {self.processes[name].pid})"
-                
-            print(f"{status_icon} {comp['description']:<30} {status.upper()}{pid}")
-        
-        print("="*60)
-        
-        if self.is_market_hours():
-            print("🟢 Market Status: OPEN")
-        else:
-            print("🔴 Market Status: CLOSED")
-            
-        print(f"⏰ Current Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("="*60 + "\n")
-    
-    def start_trading_session(self, mode: str = "full", bypass_market_hours: bool = False, auto_wait: bool = True):
-        """Start a complete trading session"""
-        self.logger.info(f"🚀 Starting trading session in {mode} mode...")
-        
-        if not self.validate_environment(bypass_market_hours, auto_wait):
-            self.logger.error("❌ Environment validation failed - cannot start trading")
-            return False
-            
-        self.running = True
-        
-        # Start monitoring thread
-        monitor_thread = threading.Thread(target=self.monitor_components, daemon=True)
-        monitor_thread.start()
-        
-        # Start components based on mode
-        if mode == "full":
-            # Start main trading bot
-            if not self.start_component('main_bot'):
-                self.logger.error("❌ Failed to start main trading bot")
-                return False
-                
-            # Start dashboard if requested
-            if "--dashboard" in sys.argv:
-                time.sleep(2)  # Brief delay
-                self.start_component('dashboard')
-                
-        elif mode == "demo":
-            # Start demo mode
-            if not self.start_component('main_bot', ['--dry-run']):
-                self.logger.error("❌ Failed to start demo mode")
-                return False
-                
-        elif mode == "test":
-            # Start test mode with specific symbol
-            symbol = input("Enter symbol to test (e.g., AAPL): ").strip().upper()
-            if symbol:
-                if not self.start_component('main_bot', ['--test', symbol, '--dry-run']):
-                    self.logger.error("❌ Failed to start test mode")
-                    return False
-        
-        self.logger.info("✅ Trading session started successfully")
-        return True
-    
-    def stop_trading_session(self):
-        """Stop the trading session and all components"""
-        self.logger.info("🛑 Stopping trading session...")
-        self.running = False
-        
-        # Stop all components
-        for component_name in list(self.processes.keys()):
-            self.stop_component(component_name)
-            
-        self.logger.info("✅ Trading session stopped")
-    
-    def interactive_menu(self):
-        """Show interactive menu for managing the trading system"""
-        while True:
-            self.print_status()
-            
-            print("Available Commands:")
-            print("1. Start Full Trading Session (Auto-wait for market)")
-            print("2. Start Demo Mode (Safe Testing)")
-            print("3. Start Test Mode (Single Symbol)")
-            print("4. Start Live P&L Monitor Only")
-            print("5. 🧪 Test Mode (Bypass Market Hours)")
-            print("6. 🕐 Show Market Status & Countdown")
-            print("7. 💾 Backup to GitHub")
-            print("8. Stop Trading Session")
-            print("9. Restart Component")
-            print("10. Generate P&L Report")
-            print("11. Generate EOD Report")
-            print("12. View Live Dashboard")
-            print("13. Validate Environment")
-            print("14. Exit")
-            
-            choice = input("\nEnter your choice (1-14): ").strip()
-            
-            if choice == "1":
-                if not any(self.processes.values()):
-                    print("🚀 Starting full trading session...")
-                    if not self.is_market_hours():
-                        print("⏰ Market is closed. The bot will wait for market open.")
-                    self.start_trading_session("full", auto_wait=True)
-                else:
-                    print("❌ Trading session is already running")
-                    
-            elif choice == "2":
-                if not any(self.processes.values()):
-                    self.start_component('demo_bot')
-                else:
-                    print("❌ Components are already running")
-                    
-            elif choice == "3":
-                if not any(self.processes.values()):
-                    self.start_trading_session("test", auto_wait=True)
-                else:
-                    print("❌ Trading session is already running")
-                    
-            elif choice == "4":
-                if 'live_pnl' not in self.processes:
-                    self.start_component('live_pnl')
-                else:
-                    print("ℹ️ P&L monitor is already running")
-                    
-            elif choice == "5":
-                if not any(self.processes.values()):
-                    print("🧪 Testing mode - bypassing market hours check")
-                    mode = input("Choose mode (full/demo/test): ").strip().lower()
-                    if mode in ['full', 'demo', 'test']:
-                        if mode == 'test':
-                            symbol = input("Enter symbol to test (e.g., AAPL): ").strip().upper()
-                            if symbol:
-                                # Override component args for test mode
-                                self.components['main_bot']['args'] = ['--test', symbol, '--dry-run']
-                        self.start_trading_session(mode, bypass_market_hours=True, auto_wait=False)
-                    else:
-                        print("❌ Invalid mode")
-                else:
-                    print("❌ Trading session is already running")
-                    
-            elif choice == "6":
-                self.show_market_status()
-                
-            elif choice == "7":
-                self.backup_to_github()
-                    
-            elif choice == "8":
-                self.stop_trading_session()
-                
-            elif choice == "9":
-                self.restart_component_menu()
-                
-            elif choice == "10":
-                self.generate_pnl_report()
-                
-            elif choice == "11":
-                self.generate_eod_report()
-                
-            elif choice == "12":
-                self.launch_dashboard()
-                
-            elif choice == "13":
-                print("🔍 Validating environment...")
-                if self.validate_environment(bypass_market_hours=True):
-                    print("✅ Environment validation passed")
-                else:
-                    print("❌ Environment validation failed")
-                    
-            elif choice == "14":
-                if any(self.processes.values()):
-                    confirm = input("Trading session is running. Stop and exit? (y/N): ")
-                    if confirm.lower() == 'y':
-                        self.stop_trading_session()
-                        break
-                else:
-                    break
-            else:
-                print("❌ Invalid choice")
-                
-            input("\nPress Enter to continue...")
-    
-    def restart_component_menu(self):
-        """Show menu for restarting specific components"""
-        running_components = [name for name, proc in self.processes.items() 
-                            if proc.poll() is None]
-        
-        if not running_components:
-            print("❌ No components are currently running")
-            return
-            
-        print("\nRunning Components:")
-        for i, name in enumerate(running_components, 1):
-            comp = self.components[name]
-            print(f"{i}. {comp['description']}")
-            
+    def validate_environment(self):
+        """Validate trading environment"""
         try:
-            choice = int(input("\nSelect component to restart (0 to cancel): "))
-            if 1 <= choice <= len(running_components):
-                component_name = running_components[choice - 1]
-                comp = self.components[component_name]
-                
-                print(f"🔄 Restarting {comp['description']}...")
-                self.stop_component(component_name)
-                time.sleep(2)
-                self.start_component(component_name)
-                
-        except (ValueError, IndexError):
-            print("❌ Invalid selection")
-    
-    def generate_pnl_report(self):
-        """Generate P&L report"""
-        try:
-            print("📊 Generating P&L report...")
-            result = subprocess.run([
-                self.python_cmd, 'main.py', '--pnl-report'
-            ], capture_output=True, text=True, timeout=30)
+            print("[VALIDATE] Testing environment...")
+            self.logger.info("[VALIDATE] Testing environment")
+            
+            # Test main.py validation
+            result = subprocess.run([self.python_cmd, 'main.py', '--validate-only'],
+                                  capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:
-                print(result.stdout)
+                print("[SUCCESS] Environment validation passed")
+                self.logger.info("[SUCCESS] Environment validation passed")
+                return True
             else:
-                print(f"❌ Error generating report: {result.stderr}")
+                print(f"[ERROR] Validation failed: {result.stderr}")
+                self.logger.error(f"[ERROR] Validation failed: {result.stderr}")
+                return False
                 
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"[ERROR] Validation error: {e}")
+            self.logger.error(f"[ERROR] Validation error: {e}")
+            return False
     
-    def generate_eod_report(self):
-        """Generate end-of-day report"""
+    def show_live_logs(self):
+        """Show live log feed"""
         try:
-            print("📊 Generating end-of-day report...")
-            result = subprocess.run([
-                self.python_cmd, 'generate_eod_report.py'
-            ], capture_output=True, text=True, timeout=60)
+            print("\n" + "="*70)
+            print("               LIVE LOG MONITORING")
+            print("="*70)
+            print("[INFO] Showing recent activity from log files")
+            print("[CTRL+C] Press Ctrl+C to return to menu")
+            print("="*70)
             
-            if result.returncode == 0:
-                print(result.stdout)
-                print("✅ EOD report generated successfully")
-            else:
-                print(f"❌ Error generating EOD report: {result.stderr}")
-                
-        except Exception as e:
-            print(f"❌ Error: {e}")
-    
-    def backup_to_github(self):
-        """Manual backup to GitHub"""
-        try:
-            print("💾 Starting GitHub backup...")
-            
-            # Check if git repository exists
-            if not Path(".git").exists():
-                print("❌ No git repository found. Please run setup_github.ps1 first.")
+            log_files = list(Path('logs').glob('*.log'))
+            if not log_files:
+                print("[INFO] No log files found")
+                input("\nPress Enter to continue...")
                 return
             
-            # Run the backup script
-            backup_script = Path("backup_to_github.ps1")
-            if backup_script.exists():
-                result = subprocess.run([
-                    "powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(backup_script)
-                ], capture_output=True, text=True, timeout=120)
-                
-                if result.returncode == 0:
-                    print("✅ GitHub backup completed successfully!")
-                    print(result.stdout)
-                else:
-                    print("❌ Backup failed:")
-                    print(result.stderr)
+            # Show recent entries from the most recent log
+            latest_log = max(log_files, key=lambda x: x.stat().st_mtime)
+            print(f"[FILE] Monitoring: {latest_log.name}")
+            print("-" * 70)
+            
+            # Show last 20 lines
+            try:
+                with open(latest_log, 'r', encoding='ascii', errors='replace') as f:
+                    lines = f.readlines()[-20:]
+                    for line in lines:
+                        print(line.strip())
+            except Exception as e:
+                print(f"[ERROR] Could not read log file: {e}")
+            
+            print("-" * 70)
+            input("\nPress Enter to continue...")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to show logs: {e}")
+            self.logger.error(f"[ERROR] Failed to show logs: {e}")
+    
+    def generate_report(self):
+        """Generate trading report"""
+        try:
+            print("[REPORT] Generating trading report...")
+            self.logger.info("[REPORT] Generating trading report")
+            
+            result = subprocess.run([self.python_cmd, 'main.py', '--pnl-report'],
+                                  capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(result.stdout)
+                print("[SUCCESS] Report generated")
+                self.logger.info("[SUCCESS] Report generated")
             else:
-                print("❌ Backup script not found. Please run setup_github.ps1 first.")
+                print(f"[ERROR] Report generation failed: {result.stderr}")
+                self.logger.error(f"[ERROR] Report generation failed: {result.stderr}")
                 
         except Exception as e:
-            print(f"❌ Error during backup: {e}")
+            print(f"[ERROR] Report generation error: {e}")
+            self.logger.error(f"[ERROR] Report generation error: {e}")
     
-    def show_market_status(self):
-        """Display current market status and countdown to next open"""
-        est = pytz.timezone('US/Eastern')
-        now = datetime.now(est)
-        
-        print("\n" + "="*60)
-        print("📊 MARKET STATUS INFORMATION")
-        print("="*60)
-        print(f"📅 Current Time: {now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        
-        if self.is_market_hours():
-            print("🟢 Market Status: OPEN")
-            market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
-            time_to_close = (market_close - now).total_seconds()
+    def run_eod_analysis(self):
+        """Run comprehensive End-of-Day analysis"""
+        try:
+            print("\n" + "="*70)
+            print("           END-OF-DAY COMPREHENSIVE ANALYSIS")
+            print("="*70)
+            print("[INFO] This will generate comprehensive EOD reports including:")
+            print("       • Stock-by-stock P&L analysis")
+            print("       • Long vs Short performance breakdown")
+            print("       • Hourly trading patterns and timing")
+            print("       • Win/loss distribution charts")
+            print("       • Interactive HTML dashboard")
+            print("       • Detailed summary statistics")
+            print("="*70)
             
-            if time_to_close > 0:
-                hours = int(time_to_close // 3600)
-                minutes = int((time_to_close % 3600) // 60)
-                print(f"⏰ Time Until Close: {hours:02d}:{minutes:02d}")
-            else:
-                print("⏰ Market closing soon")
-        else:
-            print("🔴 Market Status: CLOSED")
-            next_open = self.get_next_market_open()
-            print(f"🚀 Next Market Open: {next_open.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            choice = input("\nRun EOD Analysis now? (y/N): ").strip().lower()
             
-            time_to_open = (next_open - now).total_seconds()
-            
-            if time_to_open > 0:
-                days = int(time_to_open // 86400)
-                hours = int((time_to_open % 86400) // 3600)
-                minutes = int((time_to_open % 3600) // 60)
+            if choice in ['y', 'yes']:
+                print("\n[START] Running comprehensive EOD analysis...")
+                self.logger.info("[START] Running EOD analysis")
                 
-                if days > 0:
-                    print(f"⏰ Time Until Open: {days} day(s), {hours:02d}:{minutes:02d}")
-                else:
-                    print(f"⏰ Time Until Open: {hours:02d}:{minutes:02d}")
+                result = subprocess.run([self.python_cmd, 'eod_analysis.py'],
+                                      capture_output=True, text=True, timeout=300)
+                
+                if result.returncode == 0:
+                    print(result.stdout)
+                    print("\n[SUCCESS] ✅ EOD Analysis completed!")
+                    print("[INFO] 📁 Reports saved to: reports/[today]/")
                     
-                # Show day of week info for weekends
-                if now.weekday() >= 5:
-                    print("📅 Weekend - Markets closed until Monday")
-        
-        print("="*60 + "\n")
+                    # Try to open dashboard
+                    from datetime import datetime
+                    import webbrowser
+                    from pathlib import Path
+                    
+                    today = datetime.now().strftime('%Y-%m-%d')
+                    dashboard_path = Path("reports") / today / "eod_dashboard.html"
+                    
+                    if dashboard_path.exists():
+                        open_dashboard = input("\nOpen interactive dashboard? (Y/n): ").strip().lower()
+                        if open_dashboard != 'n':
+                            try:
+                                webbrowser.open(f"file://{dashboard_path.absolute()}")
+                                print(f"[SUCCESS] 🌐 Dashboard opened: {dashboard_path}")
+                            except Exception as e:
+                                print(f"[ERROR] Could not open dashboard: {e}")
+                    
+                    self.logger.info("[SUCCESS] EOD analysis completed")
+                    
+                else:
+                    print(f"[ERROR] EOD Analysis failed: {result.stderr}")
+                    self.logger.error(f"[ERROR] EOD analysis failed: {result.stderr}")
+            else:
+                print("[CANCEL] EOD Analysis cancelled")
+                
+        except Exception as e:
+            print(f"[ERROR] EOD Analysis error: {e}")
+            self.logger.error(f"[ERROR] EOD analysis error: {e}")
     
-    def launch_dashboard(self):
-        """Launch live dashboard"""
-        if 'dashboard' not in self.processes:
-            self.start_component('dashboard')
-        else:
-            print("ℹ️ Dashboard is already running")
-
-def signal_handler(signum, frame):
-    """Handle shutdown signals"""
-    print("\n🛑 Shutdown signal received...")
-    global orchestrator
-    if 'orchestrator' in globals():
-        orchestrator.stop_trading_session()
-    sys.exit(0)
+    def run_github_backup(self):
+        """Run GitHub backup system - manual or scheduled"""
+        try:
+            print("\n" + "="*70)
+            print("           GITHUB BACKUP SYSTEM")
+            print("="*70)
+            print("[INFO] Repository: https://github.com/fortis2a/rev_intraday_bot")
+            print("[INFO] This will backup your complete trading system including:")
+            print("       • All Python code and configurations")
+            print("       • Trading strategies and core components")
+            print("       • Launchers and utility scripts")
+            print("       • Documentation and setup files")
+            print()
+            print("[EXCLUDED] For security and efficiency:")
+            print("       • Environment variables (.env file)")
+            print("       • Log files and reports (generated data)")
+            print("       • Python cache files")
+            print("="*70)
+            print("1. Backup Now (Manual)")
+            print("2. Start Auto Scheduler (Daily at midnight)")
+            print("3. Cancel")
+            print("="*70)
+            
+            choice = input("\nSelect backup option (1-3): ").strip()
+            
+            if choice == '1':
+                print("\n[START] Running manual GitHub backup...")
+                self.logger.info("[START] Running manual GitHub backup")
+                
+                result = subprocess.run([self.python_cmd, 'backup_system.py', 'backup'],
+                                      capture_output=True, text=True, timeout=120)
+                
+                if result.returncode == 0:
+                    print(result.stdout)
+                    print("\n[SUCCESS] ✅ GitHub backup completed!")
+                    print("[INFO] 📦 Repository: https://github.com/fortis2a/rev_intraday_bot")
+                    self.logger.info("[SUCCESS] GitHub backup completed")
+                else:
+                    print(f"[ERROR] GitHub backup failed: {result.stderr}")
+                    self.logger.error(f"[ERROR] GitHub backup failed: {result.stderr}")
+                    
+            elif choice == '2':
+                print("\n[START] Starting auto backup scheduler...")
+                print("[INFO] This will run backup daily at midnight")
+                print("[INFO] Press Ctrl+C to stop the scheduler")
+                self.logger.info("[START] Starting auto backup scheduler")
+                
+                try:
+                    result = subprocess.run([self.python_cmd, 'backup_system.py', 'schedule'],
+                                          timeout=None)  # No timeout for scheduler
+                except KeyboardInterrupt:
+                    print("\n[STOP] Backup scheduler stopped")
+                    self.logger.info("[STOP] Backup scheduler stopped")
+                    
+            elif choice == '3':
+                print("[CANCEL] GitHub backup cancelled")
+            else:
+                print("[ERROR] Invalid choice")
+                
+        except Exception as e:
+            print(f"[ERROR] GitHub backup error: {e}")
+            self.logger.error(f"[ERROR] GitHub backup error: {e}")
+    
+    def start_live_trading_with_signals(self):
+        """Start live trading and show real-time signals"""
+        try:
+            print("\n" + "="*70)
+            print("           STARTING LIVE TRADING WITH SIGNAL FEED")
+            print("="*70)
+            print("[INFO] This will start the trading engine and show live signals")
+            print("[INFO] You'll see account info, trading decisions, and market data")
+            print("[CTRL+C] Press Ctrl+C to stop and return to menu")
+            print("="*70)
+            
+            # Show account info first
+            self.show_account_info()
+            
+            # Start the main engine
+            if self.start_main_engine("LIVE"):
+                print("[INFO] Trading engine started - monitoring for signals...")
+                
+                # Monitor the process and show logs
+                process = self.processes.get('main_engine')
+                if process:
+                    try:
+                        # Let it run and show live output
+                        while process.poll() is None:
+                            time.sleep(2)
+                            # Show recent logs
+                            self.show_recent_activity()
+                            
+                    except KeyboardInterrupt:
+                        print("\n[STOP] Stopping live trading...")
+                        self.stop_process('main_engine')
+                        print("[STOP] Live trading stopped")
+            else:
+                print("[ERROR] Failed to start trading engine")
+                
+        except Exception as e:
+            print(f"[ERROR] Live trading failed: {e}")
+            self.logger.error(f"[ERROR] Live trading failed: {e}")
+    
+    def show_recent_activity(self):
+        """Show recent activity from logs"""
+        try:
+            log_files = list(Path('logs').glob('*intraday_engine*.log'))
+            if log_files:
+                latest_log = max(log_files, key=lambda x: x.stat().st_mtime)
+                with open(latest_log, 'r', encoding='ascii', errors='replace') as f:
+                    lines = f.readlines()[-5:]  # Last 5 lines
+                    for line in lines:
+                        if line.strip():
+                            print(f"[LOG] {line.strip()}")
+        except:
+            pass  # Ignore errors in log reading
+    
+    def main_menu(self):
+        """Main menu loop"""
+        while True:
+            try:
+                self.show_status()
+                
+                print("\nIntraday Trading Bot - Main Menu:")
+                print("1. Start Full Trading Session (Live Mode)")
+                print("2. Start Demo Mode (Safe Testing)")
+                print("3. Start Test Mode (Single Cycle)")
+                print("4. Start P&L Monitor Only")
+                print("5. Start Live Trading + Show Signal Feed")
+                print("6. Start Dashboard")
+                print("7. Show Live Logs")
+                print("8. Show Account Information")
+                print("9. Generate Trading Report")
+                print("10. EOD Analysis (End-of-Day Reports)")
+                print("11. GitHub Backup (Manual & Auto Scheduler)")
+                print("12. Validate Environment")
+                print("13. Stop All Processes")
+                print("14. Exit")
+                
+                choice = input("\nEnter your choice (1-14): ").strip()
+                
+                if choice == '1':
+                    print("\n[START] Starting full trading session...")
+                    if self.validate_environment():
+                        if self.start_main_engine("LIVE"):
+                            print("[SUCCESS] Full trading session started")
+                            print("[INFO] Check logs for trading activity")
+                        else:
+                            print("[ERROR] Failed to start trading session")
+                    else:
+                        print("[ERROR] Environment validation failed")
+                
+                elif choice == '2':
+                    print("\n[START] Starting demo mode...")
+                    if self.validate_environment():
+                        if self.start_main_engine("DEMO"):
+                            print("[SUCCESS] Demo mode started")
+                            print("[INFO] This is safe mode - no real trades")
+                        else:
+                            print("[ERROR] Failed to start demo mode")
+                    else:
+                        print("[ERROR] Environment validation failed")
+                
+                elif choice == '3':
+                    print("\n[START] Starting test mode...")
+                    if self.validate_environment():
+                        if self.start_main_engine("TEST"):
+                            print("[SUCCESS] Test mode started")
+                            print("[INFO] Single test cycle - will auto-stop")
+                        else:
+                            print("[ERROR] Failed to start test mode")
+                    else:
+                        print("[ERROR] Environment validation failed")
+                
+                elif choice == '4':
+                    print("\n[START] Starting P&L monitor...")
+                    if self.start_pnl_monitor():
+                        print("[SUCCESS] P&L monitor started")
+                        print("[INFO] Check logs for P&L updates")
+                    else:
+                        print("[ERROR] Failed to start P&L monitor")
+                
+                elif choice == '5':
+                    print("\n[START] Starting live trading with signal feed...")
+                    if self.validate_environment():
+                        self.start_live_trading_with_signals()
+                    else:
+                        print("[ERROR] Environment validation failed")
+                
+                elif choice == '6':
+                    print("\n[START] Starting dashboard...")
+                    if self.start_dashboard():
+                        print("[SUCCESS] Dashboard started")
+                    else:
+                        print("[ERROR] Failed to start dashboard")
+                
+                elif choice == '7':
+                    self.show_live_logs()
+                
+                elif choice == '8':
+                    self.show_account_info()
+                
+                elif choice == '9':
+                    self.generate_report()
+                
+                elif choice == '10':
+                    self.run_eod_analysis()
+                
+                elif choice == '11':
+                    self.run_github_backup()
+                
+                elif choice == '12':
+                    if self.validate_environment():
+                        print("[SUCCESS] Environment validation passed")
+                    else:
+                        print("[ERROR] Environment validation failed")
+                
+                elif choice == '13':
+                    self.stop_all()
+                    print("[SUCCESS] All processes stopped")
+                
+                elif choice == '14':
+                    print("\n[EXIT] Shutting down trading system...")
+                    self.stop_all()
+                    print("[EXIT] Goodbye!")
+                    break
+                
+                else:
+                    print("[ERROR] Invalid choice. Please enter 1-14.")
+                
+                if choice != '14':
+                    input("\nPress Enter to continue...")
+                
+            except KeyboardInterrupt:
+                print("\n[STOP] Shutting down...")
+                self.stop_all()
+                break
+            except Exception as e:
+                print(f"[ERROR] Menu error: {e}")
+                self.logger.error(f"[ERROR] Menu error: {e}")
+                input("\nPress Enter to continue...")
 
 def main():
     """Main entry point"""
-    # Setup signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
-    parser = argparse.ArgumentParser(description="Intraday Trading System Orchestrator")
-    parser.add_argument('--mode', choices=['full', 'demo', 'test', 'interactive'], 
-                       default='interactive', help='Launch mode')
-    parser.add_argument('--symbol', help='Symbol for test mode')
-    parser.add_argument('--dashboard', action='store_true', help='Include dashboard')
-    parser.add_argument('--status', action='store_true', help='Show status and exit')
-    
-    args = parser.parse_args()
-    
-    global orchestrator
-    orchestrator = TradingSystemOrchestrator()
-    
-    if args.status:
-        orchestrator.print_status()
-        return
-    
     try:
-        if args.mode == 'interactive':
-            orchestrator.interactive_menu()
-        else:
-            if args.mode == 'test' and args.symbol:
-                # Override component args for test mode
-                orchestrator.components['main_bot']['args'] = ['--test', args.symbol, '--dry-run']
-                
-            success = orchestrator.start_trading_session(args.mode)
-            if success:
-                print("🚀 Trading system started. Press Ctrl+C to stop...")
-                
-                # Keep running until interrupted
-                try:
-                    while orchestrator.running:
-                        time.sleep(1)
-                except KeyboardInterrupt:
-                    pass
-                    
-            orchestrator.stop_trading_session()
-            
+        launcher = TradingLauncher()
+        launcher.main_menu()
     except Exception as e:
-        print(f"❌ Fatal error: {e}")
-        orchestrator.stop_trading_session()
-        sys.exit(1)
+        print(f"[ERROR] Launcher failed: {e}")
+    finally:
+        print("[CLEANUP] Cleaning up...")
 
 if __name__ == "__main__":
     main()
