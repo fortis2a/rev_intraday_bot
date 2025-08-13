@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-⚡ Scalping Bot Launcher
-Main entry point for the 1-5 minute scalping system
+Intraday Trading Bot Launcher
+Main entry point for the 1-5 minute intraday trading system
 """
 
 import sys
@@ -279,10 +280,10 @@ class ScalpingBotLauncher:
     def print_startup_banner(self):
         """Print startup information"""
         print("\n" + "="*60)
-        print("⚡ SCALPING BOT - HIGH FREQUENCY TRADING SYSTEM")
+        print("INTRADAY TRADING BOT - HIGH FREQUENCY TRADING SYSTEM")
         print("="*60)
-        print(f"🕐 Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"📊 Timeframe: {config.TIMEFRAME}")
+        print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Timeframe: {config.TIMEFRAME}")
         print(f"💰 Max Daily Loss: {config.MAX_DAILY_LOSS_PCT}% of portfolio")
         print(f"📈 Max Positions: {config.MAX_OPEN_POSITIONS}")
         print(f"🎯 Risk per Trade: {config.ACCOUNT_RISK_PCT}%")

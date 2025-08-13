@@ -41,14 +41,14 @@ class TradingSystemOrchestrator:
         # Component definitions
         self.components = {
             'main_bot': {
-                'script': 'intraday_trading_bot.py',
+                'script': 'main.py',
                 'description': 'Main intraday trading bot',
                 'critical': True,
                 'restart_on_failure': True,
                 'args': []
             },
             'dashboard': {
-                'script': 'intraday_trading_bot.py',
+                'script': 'main.py',
                 'description': 'Trading dashboard interface',
                 'critical': False,
                 'restart_on_failure': False,
@@ -102,7 +102,7 @@ class TradingSystemOrchestrator:
                 
             # Check required files exist
             required_files = [
-                'intraday_trading_bot.py',
+                'main.py',
                 'config.py',
                 'core/intraday_engine.py'
             ]
@@ -115,7 +115,7 @@ class TradingSystemOrchestrator:
             # Test API connectivity
             self.logger.info("📡 Testing API connectivity...")
             test_result = subprocess.run([
-                self.python_cmd, 'intraday_trading_bot.py', '--validate-only'
+                self.python_cmd, 'main.py', '--validate-only'
             ], capture_output=True, text=True, timeout=30)
             
             if test_result.returncode != 0:
@@ -582,7 +582,7 @@ class TradingSystemOrchestrator:
         try:
             print("📊 Generating P&L report...")
             result = subprocess.run([
-                self.python_cmd, 'intraday_trading_bot.py', '--pnl-report'
+                self.python_cmd, 'main.py', '--pnl-report'
             ], capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:

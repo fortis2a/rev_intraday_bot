@@ -36,9 +36,11 @@ from utils.logger import setup_logger
 class IntradayEngine:
     """Main intraday trading engine for swing trades"""
     
-    def __init__(self):
+    def __init__(self, demo_mode=False, bypass_market_hours=False):
         """Initialize intraday trading engine"""
         self.logger = setup_logger("intraday_engine")
+        self.demo_mode = demo_mode
+        self.bypass_market_hours = bypass_market_hours
 
         # Setup quieter loggers for noisy components
         logging.getLogger("dynamic_risk").setLevel(logging.WARNING)
@@ -2466,6 +2468,72 @@ class IntradayEngine:
                 mf.write(f"- Time Buckets CSV: {time_csv}\n")
         except Exception as e:
             self.logger.debug(f"Markdown report failed: {e}")
+
+    def validate_environment(self):
+        """Validate the trading environment"""
+        try:
+            self.logger.info("Validating trading environment...")
+            
+            # Test data manager initialization
+            self.data_manager = DataManager()
+            
+            # Test API connectivity through AlpacaTrader
+            if self.data_manager.alpaca_trader:
+                account_info = self.data_manager.alpaca_trader.get_account_info()
+                if account_info:
+                    self.logger.info(f"API connected - Account equity: ${account_info['equity']:,.2f}")
+                    return True
+                else:
+                    self.logger.error("Failed to get account information")
+                    return False
+            else:
+                self.logger.error("AlpacaTrader not initialized")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Environment validation failed: {e}")
+            return False
+
+    def generate_pnl_report(self):
+        """Generate P&L report"""
+        try:
+            self.logger.info("Generating P&L report...")
+            
+            # Initialize components
+            self.data_manager = DataManager()
+            
+            # Get account info through AlpacaTrader
+            if self.data_manager.alpaca_trader:
+                account_info = self.data_manager.alpaca_trader.get_account_info()
+                if account_info:
+                    print(f"Account Value: ${account_info['portfolio_value']:,.2f}")
+                    print(f"Buying Power: ${account_info['buying_power']:,.2f}")
+                    print(f"Cash: ${account_info['cash']:,.2f}")
+                    print(f"Equity: ${account_info['equity']:,.2f}")
+                else:
+                    print("Unable to get account information")
+            else:
+                print("AlpacaTrader not available")
+                
+        except Exception as e:
+            self.logger.error(f"P&L report generation failed: {e}")
+
+    def start_trading(self, symbols):
+        """Start trading with given symbols"""
+        try:
+            self.logger.info(f"Starting trading session with symbols: {symbols}")
+            
+            # Initialize components
+            self.data_manager = DataManager()
+            self.risk_manager = RiskManager(self.data_manager)
+            self.order_manager = OrderManager(self.data_manager)
+            
+            # Start the main trading loop
+            self.start()
+            
+        except Exception as e:
+            self.logger.error(f"Trading session failed: {e}")
+            raise
 
 if __name__ == "__main__":
     print("📈 Intraday Trading Engine")
