@@ -46,3 +46,83 @@ Thumbs.db
 # Trading specific
 *.csv
 *.xlsx
+
+# Temporary development files
+test_*.py
+demo_*.py
+*_demo.py
+temp_*.py
+tmp_*.py
+debug_*.py
+
+# Exclude legitimate test files in tests/ directory
+!tests/test_*.py
+!scripts/test_*.py
+
+# === WORKSPACE CLEANUP PROTECTION ===
+# Prevent VS Code auto-restore of unwanted files
+
+# Development and testing files (root level only)
+/test_*.py
+/demo_*.py
+/*_demo.py
+/debug_*.py
+/temp_*.py
+/tmp_*.py
+
+# Analysis and diagnostic files
+/analyze_*.py
+/check_*.py
+/fix_*.py
+/diagnose_*.py
+/investigate_*.py
+/verify_*.py
+/validate_*.py
+
+# Cleanup and maintenance files
+/cleanup_*.py
+/clear_*.py
+/emergency_*.py
+/force_*.py
+/reset_*.py
+/restart_*.py
+/move_*.py
+
+# Legacy and outdated files
+/legacy_*.py
+/scalping_bot.py
+/intraday_trading_bot.py
+/main_simple.py
+/minimal_main.py
+
+# Duplicate dashboards
+/dashboard.py
+/dashboard_enhanced.py
+/live_dashboard.py
+
+# Batch and script files
+*.bat
+*.ps1
+*.sh
+
+# Analysis summaries and guides (excessive)
+/*_SUMMARY.md
+/*_GUIDE.md
+/*_ANALYSIS.md
+/*_COMPLETE.md
+/*_FIX*.md
+
+# Temporary directories
+/analysis/
+/batch/
+/archive/
+/demo_reports/
+
+# Backup files
+cleanup_backup_list.json
+
+# Exclude legitimate files in subdirectories
+!scripts/test_*.py
+!tests/test_*.py
+!docs/*_GUIDE.md
+!docs/*_SUMMARY.md

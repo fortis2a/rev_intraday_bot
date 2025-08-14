@@ -20,8 +20,17 @@ except ImportError:
 TRADING_MODE = "LIVE"  # LIVE, DEMO, TEST
 TIMEFRAME = "15Min"  # 1Min, 5Min, 15Min, 1Hour
 
-# Watchlist - stocks to monitor
+# Watchlist - PRIMARY stocks to monitor (Budget-friendly, high-performance)
 INTRADAY_WATCHLIST = [
+    'SOXL',  # $29.27 - 87.7/100 (Excellent) - 3x Leveraged Semiconductor ETF
+    'SOFI',  # $23.81 - 84.6/100 (Excellent) - Financial Services/Fintech
+    'TQQQ',  # $94.86 - 81.2/100 (Excellent) - 3x Leveraged NASDAQ ETF
+    'INTC',  # $22.22 - 79.8/100 (Good) - Intel Corporation
+    'NIO'    # $4.62 - 79.6/100 (Good) - Electric Vehicle Company
+]
+
+# Alternative watchlist - Original research stocks (backup/testing)
+INTRADAY_WATCHLIST2 = [
     'IONQ', 'RGTI', 'QBTS', 'JNJ', 'PG'
 ]
 
@@ -95,6 +104,7 @@ config = {
     'TRADING_MODE': TRADING_MODE,
     'TIMEFRAME': TIMEFRAME,
     'INTRADAY_WATCHLIST': INTRADAY_WATCHLIST,
+    'INTRADAY_WATCHLIST2': INTRADAY_WATCHLIST2,
     'MAX_POSITION_SIZE': MAX_POSITION_SIZE,
     'MAX_DAILY_LOSS': MAX_DAILY_LOSS,
     'STOP_LOSS_PCT': STOP_LOSS_PCT,

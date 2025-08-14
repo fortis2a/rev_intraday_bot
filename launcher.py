@@ -8,8 +8,9 @@ import subprocess
 import time
 import os
 import signal
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+import threading
 from logger import setup_logger
 
 class TradingLauncher:
@@ -18,7 +19,12 @@ class TradingLauncher:
     def __init__(self):
         self.logger = setup_logger('trading_launcher')
         self.processes = {}
-        self.python_cmd = 'python'
+        # Use the virtual environment python
+        venv_python = Path(__file__).parent / '.venv' / 'Scripts' / 'python.exe'
+        if venv_python.exists():
+            self.python_cmd = str(venv_python)
+        else:
+            self.python_cmd = 'python'
         
         # Create logs directory
         Path('logs').mkdir(exist_ok=True)
@@ -56,7 +62,160 @@ class TradingLauncher:
         
         print(f"[{market_status}] Market Status: {market_status}")
         print(f"[TIME] Current Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Show countdown if market is closed
+        if market_status == "CLOSED":
+            try:
+                self.show_market_countdown()
+            except Exception as e:
+                print(f"[COUNTDOWN ERROR] {e}")
+        
         print("="*70)
+    
+    def show_market_countdown(self):
+        """Show countdown to market open when market is closed"""
+        try:
+            result = subprocess.run([self.python_cmd, '-c', 
+                'from data_manager import DataManager; '
+                'dm = DataManager(); '
+                'status = dm.get_market_status(); '
+                'if status.get("next_open"): '
+                '    print(status["next_open"].isoformat()); '
+                'else: '
+                '    print("None")'], 
+                capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                next_open_str = result.stdout.strip()
+                
+                if next_open_str and next_open_str != "None":
+                    try:
+                        import pytz
+                        from datetime import datetime
+                        
+                        # Parse the next open time
+                        if '+' in next_open_str or 'Z' in next_open_str:
+                            next_open_dt = datetime.fromisoformat(next_open_str.replace('Z', '+00:00'))
+                        else:
+                            # Assume UTC if no timezone info
+                            next_open_dt = datetime.fromisoformat(next_open_str)
+                            next_open_dt = next_open_dt.replace(tzinfo=pytz.UTC)
+                        
+                        # Convert to Eastern Time (market timezone)
+                        et_tz = pytz.timezone('US/Eastern')
+                        current_et = datetime.now(et_tz)
+                        next_open_et = next_open_dt.astimezone(et_tz)
+                        
+                        # Calculate time difference
+                        time_diff = next_open_et - current_et
+                        
+                        if time_diff.total_seconds() > 0:
+                            hours, remainder = divmod(int(time_diff.total_seconds()), 3600)
+                            minutes, seconds = divmod(remainder, 60)
+                            
+                            print(f"[COUNTDOWN] Next Market Open: {next_open_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                            print(f"[COUNTDOWN] Time Until Open: {hours:02d}:{minutes:02d}:{seconds:02d}")
+                        else:
+                            print("[COUNTDOWN] Market should be opening soon...")
+                    except Exception as e:
+                        print(f"[COUNTDOWN] Error parsing time: {e}")
+                else:
+                    print("[COUNTDOWN] Unable to determine next market open time")
+            else:
+                print("[COUNTDOWN] Unable to fetch market schedule")
+                
+        except Exception as e:
+            print(f"[COUNTDOWN] Error getting market schedule: {e}")
+    
+    def start_live_timer(self):
+        """Start a live timer in a separate thread when market is closed"""
+        def timer_loop():
+            while True:
+                try:
+                    # Check market status
+                    result = subprocess.run([self.python_cmd, '-c', 
+                        'from data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
+                        capture_output=True, text=True, timeout=10)
+                    market_status = result.stdout.strip() if result.returncode == 0 else "UNKNOWN"
+                    
+                    if market_status == "CLOSED":
+                        # Clear screen and show timer
+                        os.system('cls' if os.name == 'nt' else 'clear')
+                        print("="*70)
+                        print("           MARKET CLOSED - LIVE TIMER")
+                        print("="*70)
+                        
+                        current_time = datetime.now()
+                        print(f"[LIVE TIME] {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                        
+                        # Get next market open
+                        result = subprocess.run([self.python_cmd, '-c', 
+                            'from data_manager import DataManager; '
+                            'dm = DataManager(); '
+                            'status = dm.get_market_status(); '
+                            'if status.get("next_open"): '
+                            '    print(status["next_open"].isoformat()); '
+                            'else: '
+                            '    print("None")'], 
+                            capture_output=True, text=True, timeout=10)
+                        
+                        if result.returncode == 0:
+                            next_open_str = result.stdout.strip()
+                            
+                            if next_open_str and next_open_str != "None":
+                                try:
+                                    import pytz
+                                    
+                                    # Parse the next open time
+                                    if '+' in next_open_str or 'Z' in next_open_str:
+                                        next_open_dt = datetime.fromisoformat(next_open_str.replace('Z', '+00:00'))
+                                    else:
+                                        # Assume UTC if no timezone info
+                                        next_open_dt = datetime.fromisoformat(next_open_str)
+                                        next_open_dt = next_open_dt.replace(tzinfo=pytz.UTC)
+                                    
+                                    et_tz = pytz.timezone('US/Eastern')
+                                    current_et = datetime.now(et_tz)
+                                    next_open_et = next_open_dt.astimezone(et_tz)
+                                    
+                                    time_diff = next_open_et - current_et
+                                    
+                                    if time_diff.total_seconds() > 0:
+                                        hours, remainder = divmod(int(time_diff.total_seconds()), 3600)
+                                        minutes, seconds = divmod(remainder, 60)
+                                        
+                                        print(f"[NEXT OPEN] {next_open_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                                        print(f"[COUNTDOWN] {hours:02d}:{minutes:02d}:{seconds:02d}")
+                                    else:
+                                        print("[COUNTDOWN] Market opening soon!")
+                                except Exception as e:
+                                    print(f"[COUNTDOWN ERROR] {e}")
+                            else:
+                                print("[COUNTDOWN] Unable to get next open time")
+                        
+                        print("="*70)
+                        print("Press Ctrl+C to return to main menu")
+                        
+                    else:
+                        print(f"[TIMER] Market is {market_status} - Timer stopped")
+                        break
+                        
+                    time.sleep(1)  # Update every second
+                    
+                except KeyboardInterrupt:
+                    print("\n[TIMER] Returning to main menu...")
+                    break
+                except Exception as e:
+                    print(f"[TIMER ERROR] {e}")
+                    time.sleep(5)
+        
+        timer_thread = threading.Thread(target=timer_loop, daemon=True)
+        timer_thread.start()
+        
+        try:
+            timer_thread.join()
+        except KeyboardInterrupt:
+            print("\n[TIMER] Stopped by user")
     
     def show_account_info(self):
         """Show Alpaca account information"""
@@ -435,6 +594,60 @@ while True:
             print("\n" + "="*70)
             print("           STARTING LIVE TRADING WITH SIGNAL FEED")
             print("="*70)
+            
+            # Check market status first
+            try:
+                result = subprocess.run([self.python_cmd, '-c', 
+                    'from data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
+                    capture_output=True, text=True, timeout=10)
+                market_output = result.stdout.strip() if result.returncode == 0 else "UNKNOWN"
+                # Extract just OPEN or CLOSED from the output
+                if "OPEN" in market_output:
+                    market_status = "OPEN"
+                elif "CLOSED" in market_output:
+                    market_status = "CLOSED"
+                else:
+                    market_status = "UNKNOWN"
+            except:
+                market_status = "UNKNOWN"
+            
+            print(f"[MARKET] Market Status: {market_status}")
+            print(f"[TIME] Current Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            if market_status == "CLOSED":
+                print("\n[NOTICE] ⚠️  MARKET IS CURRENTLY CLOSED ⚠️")
+                print("[INFO] Trading signals will be limited during market hours")
+                
+                # Show countdown to market open
+                try:
+                    self.show_market_countdown()
+                except Exception as e:
+                    print(f"[COUNTDOWN ERROR] {e}")
+                
+                print("\n[OPTIONS]")
+                print("1. Continue anyway (demo/testing mode)")
+                print("2. Start live timer and wait for market open")
+                print("3. Return to main menu")
+                
+                choice = input("\nEnter your choice (1-3): ").strip()
+                
+                if choice == '1':
+                    print("[INFO] Continuing in demo/testing mode...")
+                elif choice == '2':
+                    print("[TIMER] Starting live timer until market opens...")
+                    try:
+                        self.start_live_timer()
+                        return
+                    except KeyboardInterrupt:
+                        print("\n[TIMER] Timer stopped by user")
+                        return
+                elif choice == '3':
+                    print("[INFO] Returning to main menu...")
+                    return
+                else:
+                    print("[ERROR] Invalid choice, returning to main menu...")
+                    return
+            
             print("[INFO] This will start the trading engine and show live signals")
             print("[INFO] You'll see account info, trading decisions, and market data")
             print("[CTRL+C] Press Ctrl+C to stop and return to menu")
@@ -502,10 +715,12 @@ while True:
                 print("11. GitHub Backup (Manual & Auto Scheduler)")
                 print("12. Validate Environment")
                 print("13. Test Enhanced Indicators (NEW)")
-                print("14. Stop All Processes")
-                print("15. Exit")
+                print("14. Live Market Timer (Shows countdown when closed)")
+                print("15. Auto Sleep/Wake Mode (24/7 with market monitoring)")
+                print("16. Stop All Processes")
+                print("17. Exit")
                 
-                choice = input("\nEnter your choice (1-15): ").strip()
+                choice = input("\nEnter your choice (1-17): ").strip()
                 
                 if choice == '1':
                     print("\n[START] Starting full trading session...")
@@ -596,19 +811,51 @@ while True:
                         print(f"[ERROR] Failed to run enhanced indicators test: {e}")
                 
                 elif choice == '14':
+                    print("\n[TIMER] Starting live market timer...")
+                    print("[INFO] This will show live countdown when market is closed")
+                    print("[INFO] Press Ctrl+C to return to menu")
+                    try:
+                        self.start_live_timer()
+                    except KeyboardInterrupt:
+                        print("\n[TIMER] Timer stopped by user")
+                
+                elif choice == '15':
+                    print("\n[AUTO] Starting Auto Sleep/Wake Mode...")
+                    print("[INFO] Bot will automatically:")
+                    print("  • Sleep when market closes at 4:00 PM ET")
+                    print("  • Wake when market opens at 9:30 AM ET")
+                    print("  • Show live countdown timers")
+                    print("  • Display market status messages")
+                    print("[INFO] Press Ctrl+C to stop")
+                    try:
+                        result = subprocess.run([self.python_cmd, '-c', 
+                            'from core.auto_sleep_wake import AutoMarketSleepWake; '
+                            'system = AutoMarketSleepWake(); '
+                            'system.run_auto_system()'], 
+                            timeout=None)
+                        if result.returncode == 0:
+                            print("[SUCCESS] Auto sleep/wake completed")
+                        else:
+                            print("[INFO] Auto sleep/wake stopped")
+                    except KeyboardInterrupt:
+                        print("\n[STOP] Auto sleep/wake stopped by user")
+                    except Exception as e:
+                        print(f"[ERROR] Auto sleep/wake error: {e}")
+                
+                elif choice == '16':
                     self.stop_all()
                     print("[SUCCESS] All processes stopped")
                 
-                elif choice == '15':
+                elif choice == '17':
                     print("\n[EXIT] Shutting down trading system...")
                     self.stop_all()
                     print("[EXIT] Goodbye!")
                     break
                 
                 else:
-                    print("[ERROR] Invalid choice. Please enter 1-15.")
+                    print("[ERROR] Invalid choice. Please enter 1-17.")
                 
-                if choice != '15':
+                if choice != '17':
                     input("\nPress Enter to continue...")
                 
             except KeyboardInterrupt:
