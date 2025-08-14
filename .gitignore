@@ -126,3 +126,18 @@ cleanup_backup_list.json
 !tests/test_*.py
 !docs/*_GUIDE.md
 !docs/*_SUMMARY.md
+
+# === ORGANIZED STRUCTURE RULES ===
+# Allow organized files in proper directories
+!scripts/analyze_*.py
+!scripts/check_*.py
+!scripts/diagnose_*.py
+!scripts/backup_*.py
+!scripts/setup_*.py
+!scripts/trading_*.py
+!docs/summaries/*_summary.py
+!docs/summaries/*_SUMMARY.py
+!docs/*_GUIDE.md
+!docs/*_README.md
+!utils/pnl_*.py
+!utils/live_*.py
