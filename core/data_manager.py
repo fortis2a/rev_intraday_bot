@@ -10,7 +10,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 from config import config
-from logger import setup_logger, clean_message
+from utils.logger import setup_logger, clean_message
 
 class DataManager:
     """Manages market data and Alpaca API connection"""

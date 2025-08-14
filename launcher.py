@@ -11,7 +11,7 @@ import signal
 from datetime import datetime, timedelta
 from pathlib import Path
 import threading
-from logger import setup_logger
+from utils.logger import setup_logger
 
 class TradingLauncher:
     """Main launcher for the intraday trading system"""
@@ -54,7 +54,7 @@ class TradingLauncher:
         # Market status
         try:
             result = subprocess.run([self.python_cmd, '-c', 
-                'from data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
+                'from core.data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
                 capture_output=True, text=True, timeout=10)
             market_status = result.stdout.strip() if result.returncode == 0 else "UNKNOWN"
         except:
@@ -76,7 +76,7 @@ class TradingLauncher:
         """Show countdown to market open when market is closed"""
         try:
             result = subprocess.run([self.python_cmd, '-c', 
-                'from data_manager import DataManager; '
+                'from core.data_manager import DataManager; '
                 'dm = DataManager(); '
                 'status = dm.get_market_status(); '
                 'if status.get("next_open"): '
@@ -134,7 +134,7 @@ class TradingLauncher:
                 try:
                     # Check market status
                     result = subprocess.run([self.python_cmd, '-c', 
-                        'from data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
+                        'from core.data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
                         capture_output=True, text=True, timeout=10)
                     market_status = result.stdout.strip() if result.returncode == 0 else "UNKNOWN"
                     
@@ -150,7 +150,7 @@ class TradingLauncher:
                         
                         # Get next market open
                         result = subprocess.run([self.python_cmd, '-c', 
-                            'from data_manager import DataManager; '
+                            'from core.data_manager import DataManager; '
                             'dm = DataManager(); '
                             'status = dm.get_market_status(); '
                             'if status.get("next_open"): '
@@ -223,7 +223,7 @@ class TradingLauncher:
             print("\n[ACCOUNT] Fetching account information...")
             result = subprocess.run([
                 self.python_cmd, '-c',
-                'from data_manager import DataManager; dm = DataManager(); account = dm.get_account_info(); '
+                'from core.data_manager import DataManager; dm = DataManager(); account = dm.get_account_info(); '
                 'print(f"Equity: ${account[\'equity\']:,.2f}") if account else print("Failed to get account info"); '
                 'print(f"Buying Power: ${account[\'buying_power\']:,.2f}") if account else None; '
                 'print(f"Cash: ${account[\'cash\']:,.2f}") if account else None'
@@ -284,8 +284,8 @@ class TradingLauncher:
 import time
 import sys
 sys.path.append(".")
-from data_manager import DataManager
-from logger import setup_logger
+from core.data_manager import DataManager
+from utils.logger import setup_logger
 
 logger = setup_logger("pnl_monitor")
 dm = DataManager()
@@ -598,7 +598,7 @@ while True:
             # Check market status first
             try:
                 result = subprocess.run([self.python_cmd, '-c', 
-                    'from data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
+                    'from core.data_manager import DataManager; dm = DataManager(); status = dm.get_market_status(); print("OPEN" if status["is_open"] else "CLOSED")'], 
                     capture_output=True, text=True, timeout=10)
                 market_output = result.stdout.strip() if result.returncode == 0 else "UNKNOWN"
                 # Extract just OPEN or CLOSED from the output

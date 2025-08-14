@@ -8,7 +8,7 @@ ASCII-only, no Unicode characters
 import alpaca_trade_api as tradeapi
 from datetime import datetime
 from config import config
-from logger import setup_logger, clean_message
+from utils.logger import setup_logger, clean_message
 from core.trailing_stop_manager import TrailingStopManager
 
 # Import stock-specific configuration

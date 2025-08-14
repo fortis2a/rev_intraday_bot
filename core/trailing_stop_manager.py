@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from config import config
-from logger import setup_logger
+from utils.logger import setup_logger
 
 @dataclass
 class TrailingStopPosition:

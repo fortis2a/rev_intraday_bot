@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from config import config
-from logger import setup_logger, clean_message
+from utils.logger import setup_logger, clean_message
 
 class MomentumStrategy:
     """Enhanced Momentum-based trading strategy"""

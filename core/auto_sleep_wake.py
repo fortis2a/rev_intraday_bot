@@ -17,8 +17,8 @@ import schedule
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from data_manager import DataManager
-from logger import setup_logger
+from core.data_manager import DataManager
+from utils.logger import setup_logger
 
 class AutoMarketSleepWake:
     """Automatic market sleep/wake system"""
