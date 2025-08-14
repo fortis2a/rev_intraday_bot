@@ -42,6 +42,16 @@ class DataManager:
             self.logger.error(f"[ERROR] Failed to connect to Alpaca: {e}")
             raise
     
+    def ensure_connection(self):
+        """Ensure API connection is working"""
+        try:
+            # Test connection with a simple API call
+            account = self.api.get_account()
+            return account is not None
+        except Exception as e:
+            self.logger.error(f"[ERROR] Connection check failed: {e}")
+            return False
+    
     def get_account_info(self):
         """Get current account information"""
         try:
@@ -56,6 +66,31 @@ class DataManager:
         except Exception as e:
             self.logger.error(f"[ERROR] Failed to get account info: {e}")
             return None
+    
+    def get_daily_pnl(self):
+        """Get Alpaca's official daily P&L calculation"""
+        try:
+            account = self.api.get_account()
+            current_equity = float(account.equity)
+            last_equity = float(account.last_equity)
+            
+            daily_pnl = current_equity - last_equity
+            daily_return_pct = (daily_pnl / last_equity * 100) if last_equity > 0 else 0
+            
+            return {
+                'daily_pnl': daily_pnl,
+                'current_equity': current_equity,
+                'last_equity': last_equity,
+                'daily_return_pct': daily_return_pct
+            }
+        except Exception as e:
+            self.logger.error(f"[ERROR] Failed to get daily P&L: {e}")
+            return {
+                'daily_pnl': 0.0,
+                'current_equity': 0.0,
+                'last_equity': 0.0,
+                'daily_return_pct': 0.0
+            }
     
     def get_positions(self):
         """Get current positions"""

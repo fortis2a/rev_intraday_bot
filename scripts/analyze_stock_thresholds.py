@@ -14,7 +14,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import yfinance as yf
 from config import config
-from logger import setup_logger
+from utils.logger import setup_logger
 import warnings
 warnings.filterwarnings('ignore')
 

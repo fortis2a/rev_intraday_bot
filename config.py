@@ -53,6 +53,12 @@ TRAILING_STOP_MIN_MOVE = 0.005      # 0.5% minimum move to adjust trailing stop
 MARKET_OPEN = time(10, 0)   # 10:00 AM (30 min after market open)
 MARKET_CLOSE = time(15, 30)  # 3:30 PM (30 min before market close)
 
+# Trading Hours for Intraday Engine (string format expected by engine)
+TRADING_START = "10:00"     # 10:00 AM (30 min after market open)
+TRADING_END = "15:30"       # 3:30 PM (30 min before market close)
+LUNCH_BREAK_START = "12:00" # 12:00 PM (lunch break start)
+LUNCH_BREAK_END = "13:00"   # 1:00 PM (lunch break end)
+
 # Strategy Settings
 MOMENTUM_THRESHOLD = 0.015   # 1.5% price movement for momentum
 RSI_OVERSOLD = 30
@@ -85,6 +91,12 @@ MAX_POSITIONS = 5    # maximum concurrent positions
 MIN_PRICE = 5.00     # minimum stock price to trade
 MAX_PRICE = 500.00   # maximum stock price to trade
 
+# Additional Engine Settings
+MAX_OPEN_POSITIONS = 5      # Maximum open positions (same as MAX_POSITIONS)
+ADOPT_EXISTING_POSITIONS = True  # Whether to adopt existing broker positions
+MIN_VOLUME = 100000         # Minimum daily volume
+MAX_SPREAD_PCT = 0.5        # Maximum bid-ask spread percentage
+
 def validate_config():
     """Validate configuration settings"""
     if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
@@ -115,6 +127,10 @@ config = {
     'TRAILING_STOP_MIN_MOVE': TRAILING_STOP_MIN_MOVE,
     'MARKET_OPEN': MARKET_OPEN,
     'MARKET_CLOSE': MARKET_CLOSE,
+    'TRADING_START': TRADING_START,
+    'TRADING_END': TRADING_END,
+    'LUNCH_BREAK_START': LUNCH_BREAK_START,
+    'LUNCH_BREAK_END': LUNCH_BREAK_END,
     'MOMENTUM_THRESHOLD': MOMENTUM_THRESHOLD,
     'RSI_OVERSOLD': RSI_OVERSOLD,
     'RSI_OVERBOUGHT': RSI_OVERBOUGHT,
@@ -131,5 +147,42 @@ config = {
     'CHECK_INTERVAL': CHECK_INTERVAL,
     'MAX_POSITIONS': MAX_POSITIONS,
     'MIN_PRICE': MIN_PRICE,
-    'MAX_PRICE': MAX_PRICE
+    'MAX_PRICE': MAX_PRICE,
+    'MAX_OPEN_POSITIONS': MAX_OPEN_POSITIONS,
+    'ADOPT_EXISTING_POSITIONS': ADOPT_EXISTING_POSITIONS,
+    'MIN_VOLUME': MIN_VOLUME,
+    'MAX_SPREAD_PCT': MAX_SPREAD_PCT
 }
+
+# Create a simple object-like interface for dot notation access
+class ConfigObject:
+    def __init__(self, config_dict):
+        self._config = config_dict
+        for key, value in config_dict.items():
+            setattr(self, key, value)
+    
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+    
+    def __getitem__(self, key):
+        """Support dictionary-style access"""
+        return self._config[key]
+    
+    def __contains__(self, key):
+        """Support 'in' operator"""
+        return key in self._config
+    
+    def keys(self):
+        """Support .keys() method"""
+        return self._config.keys()
+    
+    def values(self):
+        """Support .values() method"""
+        return self._config.values()
+    
+    def items(self):
+        """Support .items() method"""
+        return self._config.items()
+
+# Replace the dictionary with an object that supports both dict and dot notation
+config = ConfigObject(config)
