@@ -364,7 +364,9 @@ def should_execute_trade(symbol: str, signal_type: str = 'entry') -> dict:
     STRICT POLICY: No fallback - if real-time fails, no trading
     Called immediately before placing orders
     """
-    print(f"\n🎯 FINAL TRADE DECISION CHECK: {symbol} ({signal_type})")
+    # Determine trade direction for display
+    direction = "LONG" if signal_type == "BUY" else "SHORT" if signal_type == "SELL" else signal_type.upper()
+    print(f"\n🎯 FINAL TRADE DECISION CHECK: {symbol} ({direction})")
     
     # Get real-time confidence
     confidence_data = get_real_time_confidence_for_trade(symbol)

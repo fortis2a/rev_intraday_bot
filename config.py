@@ -37,6 +37,7 @@ INTRADAY_WATCHLIST2 = [
 # Risk Management - Default values (can be overridden by stock-specific settings)
 MAX_POSITION_SIZE = 1000  # Maximum position size in dollars
 MAX_DAILY_LOSS = 500     # Maximum daily loss limit
+MAX_DAILY_LOSS_PCT = 5.0 # Maximum daily loss as percentage of account equity
 STOP_LOSS_PCT = 0.015    # 1.5% default stop loss (conservative)
 TAKE_PROFIT_PCT = 0.020  # 2.0% default take profit (conservative)
 
@@ -91,6 +92,9 @@ LOG_DIRECTORY = "logs"
 
 # System Settings
 CHECK_INTERVAL = 30  # seconds between market checks
+SIGNAL_DELAY = 30    # seconds between signal checks (same as CHECK_INTERVAL)
+signal_delay = 30    # Alternative naming for engine compatibility
+max_hold_time = 7200 # Maximum hold time in seconds (2 hours)
 MAX_POSITIONS = 5    # maximum concurrent positions
 MIN_PRICE = 5.00     # minimum stock price to trade
 MAX_PRICE = 500.00   # maximum stock price to trade
@@ -123,6 +127,7 @@ config = {
     'INTRADAY_WATCHLIST2': INTRADAY_WATCHLIST2,
     'MAX_POSITION_SIZE': MAX_POSITION_SIZE,
     'MAX_DAILY_LOSS': MAX_DAILY_LOSS,
+    'MAX_DAILY_LOSS_PCT': MAX_DAILY_LOSS_PCT,
     'STOP_LOSS_PCT': STOP_LOSS_PCT,
     'TAKE_PROFIT_PCT': TAKE_PROFIT_PCT,
     'USE_STOCK_SPECIFIC_THRESHOLDS': USE_STOCK_SPECIFIC_THRESHOLDS,
@@ -158,7 +163,9 @@ config = {
     'MAX_OPEN_POSITIONS': MAX_OPEN_POSITIONS,
     'ADOPT_EXISTING_POSITIONS': ADOPT_EXISTING_POSITIONS,
     'MIN_VOLUME': MIN_VOLUME,
-    'MAX_SPREAD_PCT': MAX_SPREAD_PCT
+    'MAX_SPREAD_PCT': MAX_SPREAD_PCT,
+    'signal_delay': signal_delay,
+    'max_hold_time': max_hold_time
 }
 
 # Create a simple object-like interface for dot notation access
