@@ -12,7 +12,6 @@ import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 import pytz
-import schedule
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))

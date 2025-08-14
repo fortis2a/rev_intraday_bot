@@ -20,7 +20,7 @@ import pytz
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from config import config, get_timeframe_config, validate_config
+from config import config, validate_config
 from utils.signal_types import ScalpingSignal
 from core.risk_manager import RiskManager
 from core.data_manager import DataManager
@@ -49,7 +49,7 @@ class IntradayEngine:
         logging.getLogger("mean_reversion_strategy").setLevel(logging.WARNING)
 
         self.config = config
-        self.timeframe_config = get_timeframe_config()
+        self.timeframe_config = config  # Use main config instead of separate timeframe config
 
         # Validate configuration
         if not validate_config():
