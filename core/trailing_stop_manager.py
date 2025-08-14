@@ -16,6 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from config import config
 from utils.logger import setup_logger
+from utils.price_utils import round_to_cent, calculate_trailing_stop_price, validate_price_precision
 
 @dataclass
 class TrailingStopPosition:
@@ -55,15 +56,30 @@ class TrailingStopManager:
             self.logger.info("❌ Trailing stops DISABLED")
     
     def add_position(self, symbol: str, entry_price: float, quantity: int, 
-                    side: str = 'long', initial_stop_price: float = None):
-        """Add a new position to trailing stop tracking"""
+                    side: str = 'long', initial_stop_price: float = None, custom_thresholds: dict = None):
+        """Add a new position to trailing stop tracking with optional custom thresholds"""
         try:
             if not config['TRAILING_STOP_ENABLED']:
                 self.logger.debug(f"[{symbol}] Trailing stops disabled - using fixed stop only")
                 return
             
+            # Use custom thresholds if provided, otherwise fall back to config defaults
+            if custom_thresholds:
+                trailing_pct = custom_thresholds.get('trailing_distance_pct', config['TRAILING_STOP_PCT'])
+                activation_pct = custom_thresholds.get('trailing_activation_pct', config['TRAILING_STOP_ACTIVATION'])
+                stop_loss_pct = custom_thresholds.get('stop_loss_pct', config['STOP_LOSS_PCT'])
+                
+                self.logger.info(f"[{symbol}] 🎯 Using custom thresholds:")
+                self.logger.info(f"[{symbol}] 📊 Trailing distance: {trailing_pct:.1%}")
+                self.logger.info(f"[{symbol}] 🚀 Activation threshold: {activation_pct:.1%}")
+                self.logger.info(f"[{symbol}] 🛡️  Stop loss: {stop_loss_pct:.1%}")
+            else:
+                trailing_pct = config['TRAILING_STOP_PCT']
+                activation_pct = config['TRAILING_STOP_ACTIVATION']
+                stop_loss_pct = config['STOP_LOSS_PCT']
+            
             if initial_stop_price is None:
-                initial_stop_price = entry_price * (1 - config['STOP_LOSS_PCT'])
+                initial_stop_price = round_to_cent(entry_price * (1 - stop_loss_pct))
             
             position = TrailingStopPosition(
                 symbol=symbol,
@@ -82,6 +98,10 @@ class TrailingStopManager:
                 unrealized_pnl=0.0
             )
             
+            # Store custom thresholds with position for later use
+            if custom_thresholds:
+                position.custom_thresholds = custom_thresholds
+            
             self.active_positions[symbol] = position
             self.logger.info(f"[{symbol}] 📍 Position added to trailing stop tracking")
             self.logger.info(f"[{symbol}] 💰 Entry: ${entry_price:.2f}, Initial Stop: ${initial_stop_price:.2f}")
@@ -99,6 +119,16 @@ class TrailingStopManager:
             position.current_price = current_price
             position.last_update_time = datetime.now()
             
+            # Get thresholds (custom or default)
+            if hasattr(position, 'custom_thresholds') and position.custom_thresholds:
+                trailing_pct = position.custom_thresholds.get('trailing_distance_pct', config['TRAILING_STOP_PCT'])
+                activation_pct = position.custom_thresholds.get('trailing_activation_pct', config['TRAILING_STOP_ACTIVATION'])
+                min_move_pct = position.custom_thresholds.get('min_move_pct', config['TRAILING_STOP_MIN_MOVE'])
+            else:
+                trailing_pct = config['TRAILING_STOP_PCT']
+                activation_pct = config['TRAILING_STOP_ACTIVATION']
+                min_move_pct = config['TRAILING_STOP_MIN_MOVE']
+            
             # Calculate profit metrics
             if position.side == 'long':
                 position.profit_pct = (current_price - position.entry_price) / position.entry_price
@@ -108,25 +138,32 @@ class TrailingStopManager:
                 if current_price > position.highest_price:
                     position.highest_price = current_price
                 
-                # Check if trailing should activate
-                activation_threshold = position.entry_price * (1 + config['TRAILING_STOP_ACTIVATION'])
+                # Check if trailing should activate using custom thresholds
+                activation_threshold = position.entry_price * (1 + activation_pct)
                 if not position.is_trailing_active and current_price >= activation_threshold:
                     position.is_trailing_active = True
                     self.logger.info(f"[{symbol}] 🚀 Trailing stop ACTIVATED at ${current_price:.2f} (+{position.profit_pct:.1%})")
+                    self.logger.info(f"[{symbol}] 🎯 Using custom activation: {activation_pct:.1%}")
                 
-                # Adjust trailing stop if active
+                # Adjust trailing stop if active using custom distance
                 if position.is_trailing_active:
-                    new_trailing_stop = position.highest_price * (1 - config['TRAILING_STOP_PCT'])
+                    new_trailing_stop = calculate_trailing_stop_price(position.highest_price, trailing_pct)
+                    
+                    # Validate price precision
+                    if not validate_price_precision(new_trailing_stop, f"{symbol} trailing_stop"):
+                        self.logger.warning(f"[{symbol}] Trailing stop precision issue: {new_trailing_stop}")
+                        new_trailing_stop = round_to_cent(new_trailing_stop)
                     
                     # Only move stop up (never down)
                     if new_trailing_stop > position.trailing_stop_price:
                         # Check minimum move threshold
                         move_pct = (new_trailing_stop - position.trailing_stop_price) / position.trailing_stop_price
-                        if move_pct >= config['TRAILING_STOP_MIN_MOVE']:
+                        if move_pct >= min_move_pct:
                             old_stop = position.trailing_stop_price
                             position.trailing_stop_price = new_trailing_stop
                             
                             self.logger.info(f"[{symbol}] 📈 Trailing stop adjusted: ${old_stop:.2f} → ${new_trailing_stop:.2f}")
+                            self.logger.info(f"[{symbol}] 🎯 Custom distance: {trailing_pct:.1%}")
                             self.logger.info(f"[{symbol}] 💎 Protected profit: {((new_trailing_stop - position.entry_price) / position.entry_price):.1%}")
                             
                             # Return update info for order modification

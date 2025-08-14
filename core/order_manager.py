@@ -9,6 +9,7 @@ import alpaca_trade_api as tradeapi
 from datetime import datetime
 from config import config
 from utils.logger import setup_logger, clean_message
+from utils.price_utils import round_to_cent, calculate_stop_loss_price, calculate_take_profit_price, validate_price_precision
 from core.trailing_stop_manager import TrailingStopManager
 
 # Import stock-specific configuration
@@ -29,44 +30,55 @@ class OrderManager:
         # Initialize trailing stop manager
         self.trailing_stop_manager = TrailingStopManager(self)
         
+        # Trading cooldown tracking
+        self.last_trade_times = {}  # symbol -> last trade timestamp
+        
         self.logger.info("Order Manager initialized with trailing stop support")
     
+    def is_trading_allowed(self, symbol):
+        """Check if trading is allowed based on cooldown period"""
+        if symbol not in self.last_trade_times:
+            return True
+            
+        from config import config
+        cooldown_minutes = config.get('TRADE_COOLDOWN_MINUTES', 5)
+        last_trade_time = self.last_trade_times[symbol]
+        current_time = datetime.now()
+        time_diff = (current_time - last_trade_time).total_seconds() / 60
+        
+        if time_diff < cooldown_minutes:
+            self.logger.info(f"[{symbol}] Trade cooldown active: {time_diff:.1f}/{cooldown_minutes} minutes")
+            return False
+        
+        return True
+    
+    def update_last_trade_time(self, symbol):
+        """Update the last trade time for a symbol"""
+        self.last_trade_times[symbol] = datetime.now()
+    
     def calculate_position_size(self, symbol, price, account_equity):
-        """Calculate appropriate position size with stock-specific adjustments"""
+        """Calculate appropriate position size - Limited to 10 shares per trade"""
         try:
-            # Get stock-specific position size multiplier
+            # Fixed position size of 10 shares for all trades
+            shares = 10
+            
+            # Get stock-specific position size multiplier for logging purposes
             base_multiplier = 1.0
-            if STOCK_SPECIFIC_AVAILABLE and config.get('USE_STOCK_SPECIFIC_THRESHOLDS', False):
+            if STOCK_SPECIFIC_AVAILABLE and config['USE_STOCK_SPECIFIC_THRESHOLDS']:
                 base_multiplier = get_position_size_multiplier(symbol)
             
-            # Use maximum position size or 10% of equity, whichever is smaller
-            base_dollar_amount = min(
-                config['MAX_POSITION_SIZE'],
-                account_equity * 0.10
-            )
-            
-            # Apply stock-specific multiplier
-            max_dollar_amount = base_dollar_amount * base_multiplier
-            
-            # Calculate shares
-            shares = int(max_dollar_amount / price)
-            
-            # Ensure minimum viable position
-            if shares < 1:
-                shares = 1
-            
             self.logger.info(f"[{symbol}] Position size: {shares} shares "
-                           f"(${shares * price:.2f}, multiplier: {base_multiplier:.2f})")
+                           f"(${shares * price:.2f}, fixed size)")
             
             return shares
             
         except Exception as e:
             self.logger.error(f"[ERROR] Failed to calculate position size: {e}")
-            return 1
+            return 10  # Return 10 shares even if there's an error
     
     def get_stock_thresholds(self, symbol):
         """Get stock-specific thresholds or defaults"""
-        if STOCK_SPECIFIC_AVAILABLE and config.get('USE_STOCK_SPECIFIC_THRESHOLDS', False):
+        if STOCK_SPECIFIC_AVAILABLE and config['USE_STOCK_SPECIFIC_THRESHOLDS']:
             thresholds = get_stock_thresholds(symbol)
             
             self.logger.info(f"[{symbol}] Using stock-specific thresholds: "
@@ -87,8 +99,28 @@ class OrderManager:
             }
     
     def place_buy_order(self, symbol, signal_data):
-        """Place a buy order"""
+        """Place a buy order with cooldown and precision checks"""
         try:
+            # Check trading cooldown
+            if not self.is_trading_allowed(symbol):
+                return None
+            
+            # Double-check for existing positions (safety measure)
+            positions = self.data_manager.get_positions()
+            existing_position = next((p for p in positions if p['symbol'] == symbol and p['side'] == 'long'), None)
+            
+            if existing_position:
+                self.logger.info(f"[SAFETY BLOCK] {symbol} - Already have long position: {existing_position['qty']} shares")
+                return None
+            
+            # Check maximum position limit
+            long_positions = [p for p in positions if p['side'] == 'long']
+            max_positions = config.get('MAX_POSITIONS', 5)
+            
+            if len(long_positions) >= max_positions:
+                self.logger.info(f"[POSITION LIMIT] Cannot open new position - already have {len(long_positions)}/{max_positions} positions")
+                return None
+            
             # Get current price and account info
             current_price = self.data_manager.get_current_price(symbol)
             account_info = self.data_manager.get_account_info()
@@ -109,9 +141,18 @@ class OrderManager:
             # Get stock-specific thresholds
             thresholds = self.get_stock_thresholds(symbol)
             
-            # Calculate stop loss and take profit using stock-specific values
-            stop_loss_price = current_price * (1 - thresholds['stop_loss_pct'])
-            take_profit_price = current_price * (1 + thresholds['take_profit_pct'])
+            # Calculate stop loss and take profit using stock-specific values with proper rounding
+            stop_loss_price = calculate_stop_loss_price(current_price, thresholds['stop_loss_pct'])
+            take_profit_price = calculate_take_profit_price(current_price, thresholds['take_profit_pct'])
+            
+            # Validate price precision to prevent sub-penny errors
+            if not validate_price_precision(stop_loss_price, f"{symbol} stop_loss"):
+                self.logger.warning(f"[WARNING] {symbol} stop loss price precision issue: {stop_loss_price}")
+                stop_loss_price = round_to_cent(stop_loss_price)
+                
+            if not validate_price_precision(take_profit_price, f"{symbol} take_profit"):
+                self.logger.warning(f"[WARNING] {symbol} take profit price precision issue: {take_profit_price}")
+                take_profit_price = round_to_cent(take_profit_price)
             
             self.logger.info(f"[ORDER] Placing BUY order for {symbol}")
             self.logger.info(f"[ORDER] Shares: {shares}, Price: ${current_price:.2f}")
@@ -131,6 +172,9 @@ class OrderManager:
             
             self.logger.info(f"[SUCCESS] Buy order placed - Order ID: {order.id}")
             
+            # Update last trade time for cooldown tracking
+            self.update_last_trade_time(symbol)
+            
             # Add position to trailing stop manager with stock-specific settings
             self.trailing_stop_manager.add_position(
                 symbol=symbol,
@@ -138,7 +182,7 @@ class OrderManager:
                 quantity=shares,
                 side='long',
                 initial_stop_price=stop_loss_price,
-                custom_thresholds=thresholds  # Pass thresholds to trailing stop manager
+                custom_thresholds=thresholds
             )
             
             # Place stop loss order (will be managed by trailing stop system)
@@ -265,17 +309,25 @@ class OrderManager:
                 try:
                     position_status = self.trailing_stop_manager.get_position_status(symbol)
                     if position_status:
+                        # Ensure stop price is properly rounded to prevent sub-penny errors
+                        stop_price = round_to_cent(update_info['new_stop_price'])
+                        
+                        # Validate the price precision
+                        if not validate_price_precision(stop_price, f"{symbol} updated_stop"):
+                            self.logger.warning(f"[{symbol}] Updated stop price precision issue: {stop_price}")
+                            stop_price = round_to_cent(stop_price)
+                        
                         new_stop_order = self.api.submit_order(
                             symbol=symbol,
                             qty=position_status['symbol'] in self.get_current_positions_qty(),  # Get actual quantity
                             side='sell',
                             type='stop',
-                            stop_price=update_info['new_stop_price'],
+                            stop_price=stop_price,
                             time_in_force='day'
                         )
                         
                         self.trailing_stop_manager.stop_orders[symbol] = new_stop_order.id
-                        self.logger.info(f"[{symbol}] New trailing stop order placed: {new_stop_order.id}")
+                        self.logger.info(f"[{symbol}] New trailing stop order placed: {new_stop_order.id} at ${stop_price:.2f}")
                         
                 except Exception as e:
                     self.logger.error(f"[{symbol}] Failed to place new trailing stop order: {e}")

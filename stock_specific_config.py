@@ -4,6 +4,8 @@ Stock-Specific Configuration Module
 Implements dynamic thresholds based on historical analysis
 """
 
+from config import config  # Import config for threshold values
+
 # Stock-specific thresholds based on 60-day 15M historical analysis
 STOCK_SPECIFIC_THRESHOLDS = {
     # Budget-friendly watchlist - Primary trading stocks (2025-08-13 analysis)
@@ -384,8 +386,12 @@ def should_execute_trade(symbol: str, signal_type: str = 'entry') -> dict:
     # Get stock-specific thresholds
     thresholds = get_stock_thresholds(symbol)
     
-    # Decision logic - only trade with valid real-time confidence
-    execute_trade = confidence_data['tradeable'] and confidence_data['confidence'] > 0
+    # Get minimum confidence threshold from config
+    min_confidence = config.get('MIN_CONFIDENCE_THRESHOLD', 0.75) * 100  # Convert to percentage
+    
+    # Decision logic - trade only if confidence meets minimum threshold
+    meets_threshold = confidence_data['confidence'] >= min_confidence
+    execute_trade = confidence_data['tradeable'] and meets_threshold
     
     decision = {
         'symbol': symbol,
@@ -402,7 +408,7 @@ def should_execute_trade(symbol: str, signal_type: str = 'entry') -> dict:
         print(f"✅ EXECUTE TRADE: {symbol} - Real-time confidence: {confidence_data['confidence']:.1f}%")
     else:
         if confidence_data['confidence'] > 0:
-            print(f"❌ SKIP TRADE: {symbol} - Real-time confidence: {confidence_data['confidence']:.1f}% below 75% threshold")
+            print(f"❌ SKIP TRADE: {symbol} - Real-time confidence: {confidence_data['confidence']:.1f}% below {min_confidence:.0f}% threshold")
         else:
             print(f"❌ SKIP TRADE: {symbol} - Real-time calculation failed or returned 0% confidence")
     

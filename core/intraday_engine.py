@@ -897,6 +897,25 @@ class IntradayEngine:
             self.logger.error(f"🔥 EXECUTE_SIGNAL ENTRY: {signal.symbol} {signal.signal_type} @ ${signal.entry_price:.2f}")
             self.logger.info(f"📋 STARTING execute_signal for {signal.symbol} {signal.signal_type} @ ${signal.entry_price:.2f}")
             
+            # CRITICAL: Check individualized confidence signals before any trade
+            try:
+                from stock_specific_config import should_execute_trade
+                confidence_decision = should_execute_trade(signal.symbol, 'entry')
+                
+                if not confidence_decision['execute']:
+                    self.logger.warning(f"🚫 CONFIDENCE REJECTED: {signal.symbol} - {confidence_decision['reason']}")
+                    self.logger.info(f"📋 FAILED: Individualized confidence check failed for {signal.symbol}")
+                    return False
+                else:
+                    self.logger.info(f"✅ CONFIDENCE APPROVED: {signal.symbol} - {confidence_decision['confidence']:.1f}%")
+                    # Update signal confidence with real-time calculation
+                    signal.confidence = confidence_decision['confidence'] / 100.0
+                    
+            except Exception as conf_error:
+                self.logger.error(f"❌ Confidence system error for {signal.symbol}: {conf_error}")
+                self.logger.info(f"📋 FAILED: Confidence system error for {signal.symbol}")
+                return False
+            
             # Lightweight pre-trade quality filter
             if not self._pre_trade_filter(signal):
                 self.logger.debug(f"🚫 Pre-trade filter rejected {signal.symbol} ({signal.signal_type}) conf={getattr(signal, 'confidence', None)}")
@@ -973,7 +992,20 @@ class IntradayEngine:
             
             # Determine adaptive stop before sizing so R-based sizing can incorporate it
             entry_price = signal.entry_price
-            base_stop_pct = config.STOP_LOSS_PCT
+            
+            # Get stock-specific thresholds instead of generic config
+            try:
+                from stock_specific_config import get_stock_thresholds
+                stock_thresholds = get_stock_thresholds(signal.symbol)
+                base_stop_pct = stock_thresholds['stop_loss_pct'] * 100  # Convert to percentage
+                profit_target_pct = stock_thresholds['take_profit_pct'] * 100  # Convert to percentage
+                self.logger.info(f"📊 STOCK-SPECIFIC THRESHOLDS {signal.symbol}: Stop {base_stop_pct:.2f}% | Profit {profit_target_pct:.2f}%")
+            except Exception as threshold_error:
+                self.logger.warning(f"⚠️ Could not get stock-specific thresholds for {signal.symbol}: {threshold_error}")
+                base_stop_pct = config.STOP_LOSS_PCT
+                profit_target_pct = config.PROFIT_TARGET_PCT
+                self.logger.info(f"📊 FALLBACK THRESHOLDS {signal.symbol}: Stop {base_stop_pct:.2f}% | Profit {profit_target_pct:.2f}%")
+                
             adaptive_stop_pct = base_stop_pct
             atr_pct = None
             if getattr(config, 'USE_ATR_STOPS', False):
@@ -997,7 +1029,7 @@ class IntradayEngine:
             # Build a provisional stop price for sizing
             provisional_stop = entry_price * (1 - adaptive_stop_pct/100) if signal.signal_type == 'BUY' else entry_price * (1 + adaptive_stop_pct/100)
             signal.stop_loss = provisional_stop
-            signal.profit_target = entry_price * (1 + config.PROFIT_TARGET_PCT/100) if signal.signal_type == 'BUY' else entry_price * (1 - config.PROFIT_TARGET_PCT/100)
+            signal.profit_target = entry_price * (1 + profit_target_pct/100) if signal.signal_type == 'BUY' else entry_price * (1 - profit_target_pct/100)
 
             position_size = self.risk_manager.calculate_position_size(
                 entry_price=signal.entry_price,

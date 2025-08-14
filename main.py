@@ -14,7 +14,7 @@ from utils.logger import setup_logger, clean_message
 from core.data_manager import DataManager
 from core.order_manager import OrderManager
 from strategies import MomentumStrategy, MeanReversionStrategy, VWAPStrategy
-from core.auto_sleep_wake import AutoMarketSleepWake
+from stock_specific_config import should_execute_trade
 
 class IntradayEngine:
     """Main intraday trading engine"""
@@ -27,9 +27,6 @@ class IntradayEngine:
         
         # Validate configuration
         validate_config()
-        
-        # Initialize auto sleep/wake system
-        self.auto_sleep_wake = AutoMarketSleepWake()
         
         # Initialize components
         self.data_manager = DataManager()
@@ -55,7 +52,110 @@ class IntradayEngine:
             self.logger.info(f"[ACCOUNT] Buying Power: ${account_info['buying_power']:,.2f}")
             self.logger.info(f"[ACCOUNT] Cash: ${account_info['cash']:,.2f}")
         
+        # Recover existing positions on restart
+        self.recover_existing_positions()
+        
         self.logger.info("[SUCCESS] Intraday trading engine initialized")
+    
+    def recover_existing_positions(self):
+        """Recover and manage existing positions on restart"""
+        try:
+            self.logger.info("[RECOVERY] Checking for existing positions...")
+            
+            positions = self.data_manager.get_positions()
+            if not positions:
+                self.logger.info("[RECOVERY] No existing positions found")
+                return
+            
+            self.logger.info(f"[RECOVERY] Found {len(positions)} existing positions")
+            
+            for position in positions:
+                symbol = position['symbol']
+                qty = int(position['qty'])
+                entry_price = float(position['avg_entry_price'])
+                current_value = float(position['market_value'])
+                unrealized_pnl = float(position['unrealized_pl'])
+                side = position['side']
+                
+                self.logger.info(f"[RECOVERY] {symbol}: {qty} shares @ ${entry_price:.2f}, "
+                               f"Current: ${current_value:.2f}, P&L: ${unrealized_pnl:.2f}")
+                
+                if side == 'long':
+                    # Get stock-specific thresholds for this symbol
+                    try:
+                        from stock_specific_config import get_stock_thresholds
+                        thresholds = get_stock_thresholds(symbol)
+                    except:
+                        # Fallback to default thresholds
+                        thresholds = {
+                            'stop_loss_pct': config['STOP_LOSS_PCT'],
+                            'take_profit_pct': config['TAKE_PROFIT_PCT'],
+                            'trailing_activation_pct': config['TRAILING_STOP_ACTIVATION'],
+                            'trailing_distance_pct': config['TRAILING_STOP_PCT']
+                        }
+                    
+                    # Calculate stop loss and take profit prices
+                    stop_loss_price = entry_price * (1 - thresholds['stop_loss_pct'])
+                    take_profit_price = entry_price * (1 + thresholds['take_profit_pct'])
+                    
+                    # Get current price to check for immediate actions
+                    current_price = self.data_manager.get_current_price(symbol)
+                    
+                    if current_price:
+                        # Check if position should be closed immediately
+                        if current_price <= stop_loss_price:
+                            self.logger.warning(f"[RECOVERY] {symbol} below stop loss ${stop_loss_price:.2f}, "
+                                              f"current: ${current_price:.2f} - SELLING")
+                            self.order_manager.place_sell_order(symbol)
+                            continue
+                        
+                        elif current_price >= take_profit_price:
+                            self.logger.info(f"[RECOVERY] {symbol} above take profit ${take_profit_price:.2f}, "
+                                           f"current: ${current_price:.2f} - SELLING")
+                            self.order_manager.place_sell_order(symbol)
+                            continue
+                    
+                    # Add position to trailing stop manager for ongoing management
+                    try:
+                        self.order_manager.trailing_stop_manager.add_position(
+                            symbol=symbol,
+                            entry_price=entry_price,
+                            quantity=qty,
+                            side='long',
+                            initial_stop_price=stop_loss_price,
+                            custom_thresholds=thresholds
+                        )
+                        
+                        self.logger.info(f"[RECOVERY] {symbol} added to trailing stop management")
+                        self.logger.info(f"[RECOVERY] {symbol} Stop: ${stop_loss_price:.2f}, "
+                                       f"Target: ${take_profit_price:.2f}")
+                        
+                        # Add to active positions tracking
+                        self.active_positions[symbol] = {
+                            'qty': qty,
+                            'entry_price': entry_price,
+                            'stop_loss': stop_loss_price,
+                            'take_profit': take_profit_price
+                        }
+                        
+                    except Exception as e:
+                        self.logger.error(f"[RECOVERY] Failed to add {symbol} to trailing stop: {e}")
+                
+                else:
+                    self.logger.warning(f"[RECOVERY] {symbol} is short position - manual review required")
+            
+            if self.active_positions:
+                self.logger.info(f"[RECOVERY] Successfully recovered {len(self.active_positions)} positions")
+                self.logger.info("=" * 60)
+                self.logger.info("📊 RECOVERED POSITIONS SUMMARY")
+                self.logger.info("=" * 60)
+                for symbol, pos_data in self.active_positions.items():
+                    self.logger.info(f"{symbol}: {pos_data['qty']} shares @ ${pos_data['entry_price']:.2f}")
+                    self.logger.info(f"  Stop: ${pos_data['stop_loss']:.2f} | Target: ${pos_data['take_profit']:.2f}")
+                self.logger.info("=" * 60)
+            
+        except Exception as e:
+            self.logger.error(f"[RECOVERY] Error recovering positions: {e}")
     
     def is_market_hours(self):
         """Check if market is currently open"""
@@ -112,14 +212,10 @@ class IntradayEngine:
                 for strategy_name, strategy in self.strategies.items():
                     signal = strategy.generate_signal(symbol, df)
                     if signal:
-                        # Apply confidence threshold filter
-                        min_confidence = config['MIN_CONFIDENCE_THRESHOLD'] if config['TRADING_MODE'] == "LIVE" else config['MIN_CONFIDENCE_DEMO']
-                        
-                        if signal['confidence'] >= min_confidence:
-                            signals.append(signal)
-                            self.logger.info(f"[ENHANCED SIGNAL] {strategy_name}: {signal['action']} {symbol} - {signal['reason']} | Confidence: {signal['confidence']:.1%}")
-                        else:
-                            self.logger.info(f"[FILTERED] {strategy_name}: {signal['action']} {symbol} - Confidence {signal['confidence']:.1%} below threshold {min_confidence:.1%}")
+                        # Add strategy signal to list for processing
+                        # We'll check enhanced confidence later during execution
+                        signals.append(signal)
+                        self.logger.info(f"[STRATEGY SIGNAL] {strategy_name}: {signal['action']} {symbol} - {signal['reason']}")
                 
             except Exception as e:
                 self.logger.error(f"[ERROR] Failed to scan {symbol}: {e}")
@@ -128,10 +224,19 @@ class IntradayEngine:
         return signals
     
     def execute_signal(self, signal):
-        """Execute a trading signal"""
+        """Execute a trading signal with enhanced confidence verification"""
         try:
             symbol = signal['symbol']
             action = signal['action']
+            
+            # Enhanced confidence check using our stock-specific system
+            trade_decision = should_execute_trade(symbol)
+            
+            if not trade_decision['execute']:
+                self.logger.info(f"[CONFIDENCE BLOCK] {symbol} - {trade_decision['reason']}")
+                return False
+            
+            self.logger.info(f"[CONFIDENCE OK] {symbol} - {trade_decision['reason']}")
             
             # Check if we already have a position
             positions = self.data_manager.get_positions()
@@ -143,12 +248,12 @@ class IntradayEngine:
                     self.logger.info(f"[SKIP] Already long {symbol}")
                     return False
                 
-                # Place buy order
+                # Place buy order with enhanced confidence data
                 order_result = self.order_manager.place_buy_order(symbol, signal)
                 if order_result:
                     self.trade_count += 1
                     self.active_positions[symbol] = order_result
-                    self.logger.info(f"[EXECUTED] Buy order for {symbol} - Trade #{self.trade_count}")
+                    self.logger.info(f"[EXECUTED] Buy order for {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
                     return True
                 
             elif action == 'SELL':
@@ -160,7 +265,7 @@ class IntradayEngine:
                         # Remove from active positions
                         if symbol in self.active_positions:
                             del self.active_positions[symbol]
-                        self.logger.info(f"[EXECUTED] Sell order for {symbol} - Trade #{self.trade_count}")
+                        self.logger.info(f"[EXECUTED] Sell order for {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
                         return True
                 else:
                     self.logger.info(f"[SKIP] No position to sell for {symbol}")
@@ -219,16 +324,14 @@ class IntradayEngine:
             # Scan for signals
             signals = self.scan_for_signals()
             
+            # Process signals with enhanced confidence check
             if not signals:
                 self.logger.info("[INFO] No trading signals generated")
                 return
             
-            # Sort signals by confidence
-            signals.sort(key=lambda x: x['confidence'], reverse=True)
-            
-            # Execute top signals
+            # Execute signals (confidence will be checked during execution)
             executed_count = 0
-            for signal in signals[:3]:  # Limit to top 3 signals
+            for signal in signals[:5]:  # Limit to top 5 signals to avoid overload
                 if self.execute_signal(signal):
                     executed_count += 1
             
@@ -239,27 +342,15 @@ class IntradayEngine:
             self.logger.error(f"[ERROR] Trading cycle failed: {e}")
     
     def run(self):
-        """Main trading loop with auto sleep/wake"""
-        self.logger.info("[START] Starting main trading loop with auto sleep/wake")
+        """Main trading loop with market hours awareness"""
+        self.logger.info("[START] Starting main trading loop")
         
         try:
             cycle_count = 0
             
             while self.is_running:
-                # Check market transition (sleep/wake)
-                transition = self.auto_sleep_wake.check_market_transition()
-                
-                if transition == "SLEEP":
-                    self.logger.info("[SLEEP] Market closed - Entering sleep mode")
-                    # Run the sleep/wake system until market reopens
-                    self.auto_sleep_wake.run_auto_system()
-                    continue
-                    
-                elif transition == "WAKE":
-                    self.logger.info("[WAKE] Market opened - Resuming trading")
-                
-                # Only trade if market is open and not sleeping
-                if self.is_market_hours() and not self.auto_sleep_wake.is_sleeping:
+                # Check if market is open
+                if self.is_market_hours():
                     cycle_count += 1
                     self.logger.info(f"[LOOP] === Trading Cycle {cycle_count} ===")
                     
@@ -270,13 +361,22 @@ class IntradayEngine:
                     self.logger.info(f"[WAIT] Waiting {config['CHECK_INTERVAL']} seconds until next cycle")
                     time.sleep(config['CHECK_INTERVAL'])
                 else:
-                    # Market is closed - enter sleep mode
-                    if not self.auto_sleep_wake.is_sleeping:
-                        self.logger.info("[SLEEP] Market is closed - Entering sleep mode")
-                        self.auto_sleep_wake.go_to_sleep()
+                    # Market is closed - show status and wait
+                    self.logger.info("[INFO] Market is closed - waiting for market open")
                     
-                    # Run the sleep display system
-                    self.auto_sleep_wake.run_auto_system()
+                    # Show market status every 5 minutes when closed
+                    try:
+                        market_status = self.data_manager.get_market_status()
+                        next_open = market_status.get('next_open')
+                        if next_open:
+                            self.logger.info(f"[MARKET] Next open: {next_open}")
+                        else:
+                            self.logger.info("[MARKET] Market status unavailable")
+                    except Exception as e:
+                        self.logger.error(f"[ERROR] Failed to get market status: {e}")
+                    
+                    # Wait 5 minutes before checking again
+                    time.sleep(300)  # 5 minutes
                 
         except KeyboardInterrupt:
             self.logger.info("[STOP] Trading stopped by user")
@@ -289,10 +389,6 @@ class IntradayEngine:
         """Cleanup before shutdown"""
         try:
             self.logger.info("[CLEANUP] Starting shutdown sequence")
-            
-            # Stop auto sleep/wake system
-            if hasattr(self, 'auto_sleep_wake'):
-                self.auto_sleep_wake.stop()
             
             # Cancel all open orders
             cancelled = self.order_manager.cancel_all_orders()
