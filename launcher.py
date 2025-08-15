@@ -544,7 +544,7 @@ while True:
             print("       • Python cache files")
             print("="*70)
             print("1. Backup Now (Manual)")
-            print("2. Start Auto Scheduler (Daily at midnight)")
+            print("2. Start Auto Scheduler (Daily at 10:00 PM)")
             print("3. Cancel")
             print("="*70)
             
@@ -568,7 +568,7 @@ while True:
                     
             elif choice == '2':
                 print("\n[START] Starting auto backup scheduler...")
-                print("[INFO] This will run backup daily at midnight")
+                print("[INFO] This will run backup daily at 10:00 PM")
                 print("[INFO] Press Ctrl+C to stop the scheduler")
                 self.logger.info("[START] Starting auto backup scheduler")
                 
