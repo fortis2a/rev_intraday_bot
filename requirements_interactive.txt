@@ -1,0 +1,19 @@
+# Interactive Dashboard Requirements
+# Core dashboard frameworks
+streamlit>=1.28.0
+plotly>=5.17.0
+dash>=2.14.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Existing project requirements
+alpaca-trade-api>=3.0.0
+python-dotenv>=1.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Additional useful packages
+kaleido>=0.2.0  # For static image export
+jupyter>=1.0.0  # For Jupyter widgets option
