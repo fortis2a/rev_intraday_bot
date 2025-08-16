@@ -44,16 +44,16 @@ class TrailingStopManager:
         self.order_manager = order_manager
         self.active_positions: Dict[str, TrailingStopPosition] = {}
         self.stop_orders: Dict[str, str] = {}  # symbol -> stop_order_id
-        self.logger.info("🎯 Trailing Stop Manager initialized")
+        self.logger.info("Trailing Stop Manager initialized")
         
         # Log configuration
         if config['TRAILING_STOP_ENABLED']:
-            self.logger.info(f"✅ Trailing stops ENABLED")
-            self.logger.info(f"📊 Trailing distance: {config['TRAILING_STOP_PCT']:.1%}")
-            self.logger.info(f"🚀 Activation threshold: {config['TRAILING_STOP_ACTIVATION']:.1%}")
-            self.logger.info(f"📏 Minimum move: {config['TRAILING_STOP_MIN_MOVE']:.1%}")
+            self.logger.info("Trailing stops ENABLED")
+            self.logger.info(f"Trailing distance: {config['TRAILING_STOP_PCT']:.1%}")
+            self.logger.info(f"Activation threshold: {config['TRAILING_STOP_ACTIVATION']:.1%}")
+            self.logger.info(f"Minimum move: {config['TRAILING_STOP_MIN_MOVE']:.1%}")
         else:
-            self.logger.info("❌ Trailing stops DISABLED")
+            self.logger.info("Trailing stops DISABLED")
     
     def add_position(self, symbol: str, entry_price: float, quantity: int, 
                     side: str = 'long', initial_stop_price: float = None, custom_thresholds: dict = None):

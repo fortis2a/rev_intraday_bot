@@ -625,6 +625,35 @@ class IntradayEngine:
             self.signal_rejections[symbol] = f'exception:{type(e).__name__}'
             return []
     
+    def _determine_market_regime(self, market_data: dict, indicators: dict) -> str:
+        """Determine current market regime for trade context"""
+        try:
+            volume_ratio = indicators.get('volume_ratio', market_data.get('volume_ratio', 1.0))
+            rsi = indicators.get('rsi', 50)
+            
+            # Simple regime classification
+            if volume_ratio > 2.0:
+                if rsi > 70:
+                    return "high_volume_overbought"
+                elif rsi < 30:
+                    return "high_volume_oversold"
+                else:
+                    return "high_volume_trending"
+            elif volume_ratio > 1.5:
+                return "elevated_volume"
+            elif volume_ratio < 0.5:
+                return "low_volume"
+            else:
+                if rsi > 60:
+                    return "normal_volume_bullish"
+                elif rsi < 40:
+                    return "normal_volume_bearish"
+                else:
+                    return "normal_volume_neutral"
+                    
+        except Exception:
+            return "unknown"
+    
     def _verify_order_fill(self, order_id: str, symbol: str, intended_side: str, expected_quantity: int, timeout: int = 10) -> bool:
         """
         Verify that an order was actually filled before creating position tracking.
@@ -1207,9 +1236,45 @@ class IntradayEngine:
                     f"Stop ${execution_stop_loss:.2f} ({self.active_positions[signal.symbol]['adaptive_stop_pct']:.3f}%) "
                     f"Target ${execution_profit_target:.2f} ATR% {atr_pct_str}"
                 )
-                # Create TradeRecord
+                # Create TradeRecord with enhanced decision context
                 try:
                     md = self.data_manager.get_current_market_data(signal.symbol) or {}
+                    
+                    # 🔍 ENHANCED: Capture complete decision context for trade analysis
+                    try:
+                        from core.unified_indicators import unified_indicator_service
+                        from stock_specific_config import get_real_time_confidence_for_trade
+                        
+                        # Get current indicator snapshot
+                        bars = self.data_manager.get_bars(signal.symbol, timeframe=config.TIMEFRAME, limit=50)
+                        if bars is not None and len(bars) > 20:
+                            indicator_result = unified_indicator_service.get_indicators_for_strategy(bars, signal.symbol, signal.strategy)
+                            indicators_snapshot = indicator_result.get('current_values', {}) if 'error' not in indicator_result else {}
+                        else:
+                            indicators_snapshot = {}
+                        
+                        # Get confidence breakdown
+                        confidence_data = get_real_time_confidence_for_trade(signal.symbol)
+                        confidence_breakdown = confidence_data.get('technical_summary', {})
+                        
+                        # Determine market regime
+                        market_regime = self._determine_market_regime(md, indicators_snapshot)
+                        
+                        # Calculate risk assessment
+                        risk_assessment = {
+                            'stop_loss_pct': adaptive_stop_pct,
+                            'atr_pct': atr_pct,
+                            'position_size_calc': f"Risk-based sizing: {execution_position_size} shares",
+                            'max_risk_amount': abs(execution_entry_price - execution_stop_loss) * execution_position_size
+                        }
+                        
+                    except Exception as context_error:
+                        self.logger.debug(f"Decision context capture failed {signal.symbol}: {context_error}")
+                        indicators_snapshot = {}
+                        confidence_breakdown = {}
+                        market_regime = "unknown"
+                        risk_assessment = {}
+                    
                     tr = TradeRecord(
                         symbol=signal.symbol,
                         strategy=signal.strategy,
@@ -1222,9 +1287,30 @@ class IntradayEngine:
                         confidence=signal.confidence,
                         spread_pct=md.get('spread_pct'),
                         volume=md.get('volume'),
-                        volume_ratio=md.get('volume_ratio')
+                        volume_ratio=md.get('volume_ratio'),
+                        # 🔍 Enhanced decision context
+                        signal_reason=getattr(signal, 'reason', 'Signal reason not captured'),
+                        indicators_at_entry=indicators_snapshot,
+                        confidence_breakdown=confidence_breakdown,
+                        market_regime=market_regime,
+                        atr_percentile=atr_pct,
+                        relative_volume=md.get('volume_ratio'),
+                        risk_assessment=risk_assessment,
+                        strategy_signals={'strategy_used': signal.strategy, 'confidence_threshold': 65}
                     )
                     self._trade_records[signal.symbol] = tr
+                    
+                    # 🔍 Log decision context for immediate visibility
+                    self.logger.info(f"🔍 TRADE DECISION CONTEXT for {signal.symbol}:")
+                    self.logger.info(f"   📊 Strategy: {signal.strategy} | Confidence: {signal.confidence:.1%}")
+                    self.logger.info(f"   🎯 Reason: {getattr(signal, 'reason', 'Not captured')}")
+                    self.logger.info(f"   📈 Market Regime: {market_regime}")
+                    self.logger.info(f"   ⚖️ Risk: {adaptive_stop_pct:.2f}% stop | ATR: {atr_pct or 'N/A'}")
+                    if indicators_snapshot:
+                        key_indicators = {k: v for k, v in indicators_snapshot.items() 
+                                        if k in ['rsi', 'macd', 'vwap', 'ema_9', 'volume_ratio']}
+                        self.logger.info(f"   📊 Key Indicators: {key_indicators}")
+                    
                 except Exception as terr:
                     self.logger.debug(f"TradeRecord create failed {signal.symbol}: {terr}")
                 return True

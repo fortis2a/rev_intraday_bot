@@ -13,7 +13,9 @@ from config import config, validate_config
 from utils.logger import setup_logger, clean_message
 from core.data_manager import DataManager
 from core.order_manager import OrderManager
-from strategies import MomentumStrategy, MeanReversionStrategy, VWAPStrategy
+# from strategies.momentum_scalp import MomentumStrategy
+# from strategies.mean_reversion import MeanReversionStrategy  
+# from strategies.vwap_bounce import VWAPStrategy
 from stock_specific_config import should_execute_trade
 
 class IntradayEngine:
@@ -32,12 +34,13 @@ class IntradayEngine:
         self.data_manager = DataManager()
         self.order_manager = OrderManager(self.data_manager)
         
-        # Initialize strategies
-        self.strategies = {
-            'momentum': MomentumStrategy(),
-            'mean_reversion': MeanReversionStrategy(),
-            'vwap': VWAPStrategy()
-        }
+        # Initialize strategies (temporarily disabled)
+        # self.strategies = {
+        #     'momentum': MomentumStrategy(),
+        #     'mean_reversion': MeanReversionStrategy(),
+        #     'vwap': VWAPStrategy()
+        # }
+        self.strategies = {}  # Temporarily empty until strategies are implemented
         
         # Trading state
         self.active_positions = {}
@@ -357,9 +360,14 @@ class IntradayEngine:
                     # Execute trading cycle
                     self.trading_cycle()
                     
-                    # Sleep between cycles
-                    self.logger.info(f"[WAIT] Waiting {config['CHECK_INTERVAL']} seconds until next cycle")
-                    time.sleep(config['CHECK_INTERVAL'])
+                    # Sleep between cycles with error handling
+                    try:
+                        self.logger.info(f"[WAIT] Waiting {config['CHECK_INTERVAL']} seconds until next cycle")
+                        time.sleep(config['CHECK_INTERVAL'])
+                    except Exception as sleep_error:
+                        self.logger.error(f"[ERROR] Sleep interrupted: {sleep_error}")
+                        self.logger.info("[RECOVERY] Continuing to next cycle after sleep interruption")
+                        continue
                 else:
                     # Market is closed - show status and wait
                     self.logger.info("[INFO] Market is closed - waiting for market open")

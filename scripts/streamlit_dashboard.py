@@ -533,32 +533,69 @@ def main():
     # Enhanced Date Filtering with Calendar
     st.sidebar.subheader("📅 Date Range Selection")
     
+    # Get today's date first
+    today = datetime.now().date()
+    
     # Get available date range from data
     temp_df, _ = load_trading_data()
     if not temp_df.empty:
-        min_date = temp_df['date'].min()
-        max_date = temp_df['date'].max()
+        data_min_date = temp_df['date'].min()
+        data_max_date = temp_df['date'].max()
         
-        # Ensure date range is valid and safe defaults
+        # Ensure we include today even if no trading data exists for today
+        min_date = data_min_date
+        max_date = max(data_max_date, today)  # Always include today
+        
+        # Ensure date range is valid
         if min_date > max_date:
             min_date, max_date = max_date, min_date
-        
-        # Calculate safe default start date
-        date_range = (max_date - min_date).days
-        if date_range <= 7:
-            default_start = min_date
-        else:
-            # Ensure default start is never before min_date
-            potential_start = max_date - timedelta(days=7)
-            default_start = max(min_date, potential_start)
+            
     else:
         # Fallback dates if no data
-        today = datetime.now().date()
         min_date = today - timedelta(days=30)
         max_date = today
-        default_start = today - timedelta(days=7)
     
-    # Date range selector (outside the if/else block)
+    # Initialize session state for date filtering
+    if 'date_preset' not in st.session_state:
+        st.session_state.date_preset = "last7d"
+    
+    # Quick date presets (simplified approach)
+    st.sidebar.markdown("**🚀 Quick Presets:**")
+    preset_col1, preset_col2 = st.sidebar.columns(2)
+    
+    with preset_col1:
+        if st.button("📅 Today", key="today"):
+            st.session_state.date_preset = "today"
+            
+        if st.button("📅 Last 3d", key="last3d"):
+            st.session_state.date_preset = "last3d"
+    
+    with preset_col2:
+        if st.button("📅 Last 7d", key="last7d"):
+            st.session_state.date_preset = "last7d"
+            
+        if st.button("📅 All Data", key="all_data"):
+            st.session_state.date_preset = "all_data"
+    
+    # Calculate default dates based on preset
+    if st.session_state.date_preset == "today":
+        default_start = today  # Use actual today, not max_date
+        default_end = today    # Use actual today, not max_date
+    elif st.session_state.date_preset == "last3d":
+        default_start = max(min_date, today - timedelta(days=2))
+        default_end = today
+    elif st.session_state.date_preset == "last7d":
+        default_start = max(min_date, today - timedelta(days=6))
+        default_end = today
+    elif st.session_state.date_preset == "all_data":
+        default_start = min_date
+        default_end = max_date
+    else:
+        # Default to last 7 days ending today
+        default_start = max(min_date, today - timedelta(days=6))
+        default_end = today
+    
+    # Date range selector
     col1, col2 = st.sidebar.columns(2)
     with col1:
         start_date = st.date_input(
@@ -571,37 +608,11 @@ def main():
     with col2:
         end_date = st.date_input(
             "📅 To:",
-            value=max_date,
+            value=default_end,
             min_value=min_date,
             max_value=max_date,
             key="end_date"
         )
-    
-    # Quick date presets
-    st.sidebar.markdown("**🚀 Quick Presets:**")
-    preset_col1, preset_col2 = st.sidebar.columns(2)
-    
-    with preset_col1:
-        if st.button("📅 Today", key="today"):
-            st.session_state.start_date = max_date
-            st.session_state.end_date = max_date
-            st.rerun()
-            
-        if st.button("📅 Last 3d", key="last3d"):
-            st.session_state.start_date = max_date - timedelta(days=3)
-            st.session_state.end_date = max_date
-            st.rerun()
-    
-    with preset_col2:
-        if st.button("📅 Last 7d", key="last7d"):
-            st.session_state.start_date = max_date - timedelta(days=7)
-            st.session_state.end_date = max_date
-            st.rerun()
-            
-        if st.button("📅 All Data", key="all_data"):
-            st.session_state.start_date = min_date
-            st.session_state.end_date = max_date
-            st.rerun()
     
     # Show selected date range info
     days_selected = (end_date - start_date).days + 1
