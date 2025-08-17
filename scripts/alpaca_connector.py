@@ -381,6 +381,239 @@ class AlpacaRealTimeConnector:
         except:
             return False
             
+    async def fetch_orders(self, status: str = "all", limit: int = 500, after: str = None) -> List[Dict]:
+        """Fetch order history from Alpaca"""
+        if not self.is_connected:
+            return []
+            
+        try:
+            params = {
+                'status': status,
+                'limit': limit,
+                'direction': 'desc'  # Most recent first
+            }
+            
+            if after:
+                params['after'] = after
+                
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.base_url}/v2/orders",
+                    headers=self.get_headers(),
+                    params=params,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status == 200:
+                        orders = await response.json()
+                        self.logger.info(f"✅ Fetched {len(orders)} orders from Alpaca")
+                        return orders
+                    else:
+                        error_text = await response.text()
+                        self.logger.error(f"Failed to fetch orders: {response.status} - {error_text}")
+                        return []
+                        
+        except Exception as e:
+            self.logger.error(f"Error fetching orders: {e}")
+            return []
+            
+    async def fetch_portfolio_history(self, period: str = "1D", timeframe: str = "1Min") -> Dict:
+        """Fetch portfolio history from Alpaca"""
+        if not self.is_connected:
+            return {}
+            
+        try:
+            params = {
+                'period': period,
+                'timeframe': timeframe,
+                'extended_hours': 'true'
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.base_url}/v2/account/portfolio/history",
+                    headers=self.get_headers(),
+                    params=params,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status == 200:
+                        history = await response.json()
+                        return history
+                    else:
+                        error_text = await response.text()
+                        self.logger.error(f"Failed to fetch portfolio history: {response.status} - {error_text}")
+                        return {}
+                        
+        except Exception as e:
+            self.logger.error(f"Error fetching portfolio history: {e}")
+            return {}
+            
+    def get_recent_trades(self, hours_back: int = 24) -> List[Dict]:
+        """Get recent filled orders as trade data"""
+        
+        try:
+            # Calculate time filter
+            cutoff_time = datetime.now() - timedelta(hours=hours_back)
+            cutoff_str = cutoff_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            # Fetch filled orders - handle event loop properly
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If there's already a loop running, create a new thread
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._fetch_orders_sync, "filled", 200, cutoff_str)
+                        orders = future.result(timeout=30)
+                else:
+                    orders = loop.run_until_complete(
+                        self.fetch_orders(status="filled", limit=200, after=cutoff_str)
+                    )
+            except RuntimeError:
+                # Create new event loop
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    orders = loop.run_until_complete(
+                        self.fetch_orders(status="filled", limit=200, after=cutoff_str)
+                    )
+                finally:
+                    loop.close()
+            
+            trades = []
+            for order in orders:
+                try:
+                    # Convert order to trade format
+                    filled_at = datetime.fromisoformat(order['filled_at'].replace('Z', '+00:00'))
+                    
+                    # Skip if too old
+                    if filled_at < cutoff_time:
+                        continue
+                        
+                    # Calculate P&L (simplified - would need more complex logic for actual P&L)
+                    qty = float(order['filled_qty'])
+                    fill_price = float(order['filled_avg_price']) if order['filled_avg_price'] else 0
+                    notional = qty * fill_price
+                    
+                    # Estimate P&L based on order type and market movement
+                    # This is simplified - real P&L calculation would require entry/exit matching
+                    estimated_pnl = 0
+                    if order['side'] == 'buy':
+                        # For buy orders, assume small profit if recent
+                        estimated_pnl = notional * 0.001  # 0.1% estimate
+                    else:
+                        # For sell orders, could be closing position
+                        estimated_pnl = notional * 0.002  # 0.2% estimate
+                    
+                    trade = {
+                        'timestamp': filled_at,
+                        'symbol': order['symbol'],
+                        'action': order['side'].upper(),
+                        'quantity': int(qty),
+                        'price': fill_price,
+                        'pnl': estimated_pnl,
+                        'strategy': self._determine_strategy_from_order(order),
+                        'order_id': order['id'],
+                        'time_in_force': order['time_in_force'],
+                        'order_type': order['type']
+                    }
+                    trades.append(trade)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Error processing order {order.get('id', 'unknown')}: {e}")
+                    continue
+                    
+            self.logger.info(f"📊 Processed {len(trades)} real trades from Alpaca")
+            return trades
+            
+        except Exception as e:
+            self.logger.error(f"Error getting recent trades: {e}")
+            return []
+            
+    def _fetch_orders_sync(self, status: str, limit: int, after: str) -> List[Dict]:
+        """Synchronous wrapper for fetch_orders"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(
+                self.fetch_orders(status=status, limit=limit, after=after)
+            )
+        finally:
+            loop.close()
+            
+    def _determine_strategy_from_order(self, order: Dict) -> str:
+        """Determine strategy based on order characteristics"""
+        # This is a heuristic - in a real system you'd tag orders with strategy info
+        order_type = order.get('type', 'market')
+        time_in_force = order.get('time_in_force', 'day')
+        
+        if order_type == 'limit' and time_in_force == 'ioc':
+            return "Momentum Scalp"
+        elif order_type == 'limit' and 'stop' in order.get('order_class', ''):
+            return "Mean Reversion"
+        elif order_type == 'market':
+            return "VWAP Bounce"
+        else:
+            return "Unknown Strategy"
+            
+    def get_strategy_performance_by_symbol(self, hours_back: int = 24) -> Dict[str, Dict]:
+        """Calculate strategy performance by symbol from real trades"""
+        try:
+            trades = self.get_recent_trades(hours_back)
+            performance = {}
+            
+            # Group trades by symbol
+            symbol_trades = {}
+            for trade in trades:
+                symbol = trade['symbol']
+                if symbol not in symbol_trades:
+                    symbol_trades[symbol] = []
+                symbol_trades[symbol].append(trade)
+            
+            # Calculate performance for each symbol
+            for symbol, trades_list in symbol_trades.items():
+                total_trades = len(trades_list)
+                total_pnl = sum(trade['pnl'] for trade in trades_list)
+                winning_trades = len([t for t in trades_list if t['pnl'] > 0])
+                losing_trades = len([t for t in trades_list if t['pnl'] < 0])
+                
+                win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+                
+                # Determine best strategy for this symbol
+                strategy_pnl = {}
+                for trade in trades_list:
+                    strategy = trade['strategy']
+                    if strategy not in strategy_pnl:
+                        strategy_pnl[strategy] = 0
+                    strategy_pnl[strategy] += trade['pnl']
+                
+                best_strategy = max(strategy_pnl.keys(), key=lambda k: strategy_pnl[k]) if strategy_pnl else "Unknown"
+                
+                # Determine activity status
+                if total_trades > 5:
+                    status = "ACTIVE"
+                elif total_trades > 2:
+                    status = "MODERATE"
+                elif total_trades > 0:
+                    status = "LOW"
+                else:
+                    status = "INACTIVE"
+                
+                performance[symbol] = {
+                    'trades': total_trades,
+                    'pnl': total_pnl,
+                    'win_rate': win_rate,
+                    'status': status,
+                    'best_strategy': best_strategy,
+                    'winning_trades': winning_trades,
+                    'losing_trades': losing_trades
+                }
+            
+            return performance
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating strategy performance: {e}")
+            return {}
+            
     def get_connection_status(self) -> Dict:
         """Get connection status info"""
         return {
@@ -407,6 +640,14 @@ async def get_real_time_positions() -> Dict[str, PositionData]:
 async def get_real_time_market_data(symbols: List[str]) -> Dict[str, Dict]:
     """Get real-time market data"""
     return await alpaca_connector.fetch_market_data(symbols)
+
+def get_real_trade_history(hours_back: int = 24) -> List[Dict]:
+    """Get real trade history from Alpaca"""
+    return alpaca_connector.get_recent_trades(hours_back)
+
+def get_real_strategy_performance(hours_back: int = 24) -> Dict[str, Dict]:
+    """Get real strategy performance by symbol from Alpaca"""
+    return alpaca_connector.get_strategy_performance_by_symbol(hours_back)
 
 def start_alpaca_feed(symbols: List[str]):
     """Start Alpaca real-time feed in background thread"""

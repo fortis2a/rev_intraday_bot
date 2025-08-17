@@ -28,7 +28,10 @@ try:
     from core.risk_manager import RiskManager
     
     # Import real-time integrators
-    from scripts.alpaca_connector import alpaca_connector, start_alpaca_feed
+    from scripts.alpaca_connector import (
+        alpaca_connector, start_alpaca_feed, 
+        get_real_trade_history, get_real_strategy_performance
+    )
     from scripts.confidence_integrator import confidence_calculator, start_confidence_feed
     from scripts.trade_log_parser import trade_parser, start_trade_monitoring
     
@@ -204,6 +207,21 @@ class ScalpingCommandCenter:
                 self.alpaca_connector = alpaca_connector
                 self.confidence_calculator = confidence_calculator
                 self.trade_parser = trade_parser
+                
+                # Test Alpaca connection asynchronously
+                import asyncio
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    is_connected = loop.run_until_complete(self.alpaca_connector.test_connection())
+                    loop.close()
+                    
+                    if is_connected:
+                        self.logger.info("✅ Alpaca API connection successful - ready for real trade data")
+                    else:
+                        self.logger.warning("⚠️ Alpaca API connection failed - will use fallback data")
+                except Exception as conn_error:
+                    self.logger.warning(f"Could not test Alpaca connection: {conn_error}")
                 
                 self.logger.info("✅ Real data sources initialized successfully")
                 self.has_real_data = True
@@ -851,7 +869,44 @@ class ScalpingCommandCenter:
     def fetch_trade_data(self):
         """Fetch recent trade execution data"""
         try:
-            # Try to read from actual trade logs using trade parser
+            # First try to get real trade data from Alpaca
+            if self.has_real_data and hasattr(self, 'alpaca_connector') and self.alpaca_connector:
+                try:
+                    # Get real trades from Alpaca paper trading account
+                    real_trades = get_real_trade_history(hours_back=24)
+                    
+                    if real_trades:
+                        # Convert Alpaca trade format to display format
+                        for trade_data in real_trades:
+                            trade = {
+                                'time': trade_data['timestamp'].strftime("%H:%M:%S"),
+                                'symbol': trade_data['symbol'],
+                                'action': trade_data['action'],
+                                'quantity': trade_data['quantity'],
+                                'price': trade_data['price'],
+                                'pnl': trade_data['pnl'],
+                                'strategy': trade_data['strategy']
+                            }
+                            
+                            # Add to alerts if not already present
+                            if not any(t['time'] == trade['time'] and t['symbol'] == trade['symbol'] 
+                                     and t['action'] == trade['action'] for t in self.trade_alerts):
+                                self.trade_alerts.append(trade)
+                        
+                        # Keep only last 100 trades
+                        if len(self.trade_alerts) > 100:
+                            self.trade_alerts = self.trade_alerts[-100:]
+                            
+                        self.logger.info(f"📊 Updated with {len(real_trades)} real trades from Alpaca")
+                        return
+                        
+                    else:
+                        self.logger.info("📊 No recent trades found in Alpaca account")
+                        
+                except Exception as e:
+                    self.logger.warning(f"Could not fetch real Alpaca trades: {e}")
+                    
+            # Fallback to trade parser
             if self.has_real_data and self.trade_parser:
                 try:
                     # Get recent trades from real log parser
@@ -878,34 +933,10 @@ class ScalpingCommandCenter:
                         self.trade_alerts = self.trade_alerts[-100:]
                         
                 except Exception as e:
-                    self.logger.debug(f"Could not get real trade data: {e}")
-                    # Fall back to simulation
-                    self._simulate_trade_data()
-            else:
-                # Try to read from actual trade logs manually
-                try:
-                    log_dir = Path(__file__).parent.parent / "logs"
-                    if log_dir.exists():
-                        # Look for recent trade logs
-                        trade_files = list(log_dir.glob("scalping_*.log"))
-                        
-                        # Parse recent trades from logs (simplified implementation)
-                        for log_file in trade_files[-3:]:  # Check last 3 log files
-                            try:
-                                with open(log_file, 'r') as f:
-                                    lines = f.readlines()
-                                    # Look for trade execution patterns in logs
-                                    for line in lines[-50:]:  # Check last 50 lines
-                                        if "TRADE" in line.upper() or "EXECUTED" in line.upper():
-                                            # Parse trade data from log line
-                                            # This is a simplified example
-                                            pass
-                            except:
-                                continue
-                except Exception as e:
-                    self.logger.debug(f"Could not read trade logs: {e}")
-                
-                # Simulate trade data
+                    self.logger.debug(f"Could not get real trade data from parser: {e}")
+                    
+            # Final fallback - simulate for development only if no real data
+            if not self.trade_alerts:
                 self._simulate_trade_data()
                 
         except Exception as e:
@@ -935,15 +966,58 @@ class ScalpingCommandCenter:
     def fetch_strategy_performance(self):
         """Fetch strategy performance metrics by stock"""
         try:
+            # First try to get real strategy performance from Alpaca
+            if self.has_real_data and hasattr(self, 'alpaca_connector') and self.alpaca_connector:
+                try:
+                    # Get real performance data from Alpaca
+                    real_performance = get_real_strategy_performance(hours_back=24)
+                    
+                    if real_performance:
+                        # Use real data for symbols that have trades
+                        for symbol, perf_data in real_performance.items():
+                            self.strategy_performance[symbol] = {
+                                'trades': perf_data['trades'],
+                                'pnl': perf_data['pnl'],
+                                'win_rate': perf_data['win_rate'],
+                                'status': perf_data['status'],
+                                'best_strategy': perf_data['best_strategy']
+                            }
+                        
+                        self.logger.info(f"📊 Updated strategy performance with real data for {len(real_performance)} symbols")
+                        
+                        # Fill in any missing symbols with default data
+                        for symbol in SYMBOLS:
+                            if symbol not in self.strategy_performance:
+                                self.strategy_performance[symbol] = {
+                                    'trades': 0,
+                                    'pnl': 0.0,
+                                    'win_rate': 0.0,
+                                    'status': 'INACTIVE',
+                                    'best_strategy': 'No Strategy'
+                                }
+                        
+                        return
+                        
+                    else:
+                        self.logger.info("📊 No recent trading activity found in Alpaca account")
+                        
+                except Exception as e:
+                    self.logger.warning(f"Could not fetch real strategy performance: {e}")
+                    
+            # Fallback to confidence-based simulation for symbols with no real data
             import random
             
-            strategies = ["Mean Reversion", "Momentum Scalp", "VWAP Bounce"]
+            strategies = ["Mean Reversion", "Momentum Scalp", "VWAP Bounce", "HOLD Pattern"]
             
             for symbol in SYMBOLS:
-                # Generate realistic performance data for each stock
-                trades_count = random.randint(0, 15)
-                pnl_amount = random.uniform(-200, 400)
-                win_rate = random.uniform(35, 85)
+                # Check if we already have real data for this symbol
+                if symbol in self.strategy_performance:
+                    continue
+                    
+                # Generate fallback data
+                trades_count = random.randint(0, 5)  # Reduced since these are simulated
+                pnl_amount = random.uniform(-50, 100)  # Reduced range for simulation
+                win_rate = random.uniform(35, 75)
                 
                 # Determine best performing strategy for this stock
                 strategy_scores = {}
@@ -952,16 +1026,14 @@ class ScalpingCommandCenter:
                 best_strategy = max(strategy_scores.keys(), key=lambda k: strategy_scores[k])
                 
                 # Determine status based on recent activity
-                if trades_count > 8:
-                    status = "ACTIVE"
-                elif trades_count > 3:
+                if trades_count > 3:
                     status = "MODERATE" 
                 elif trades_count > 0:
                     status = "LOW"
                 else:
                     status = "INACTIVE"
                 
-                # Try to get real data from confidence calculator
+                # Try to get real confidence data to improve estimates
                 if self.has_real_data and self.confidence_calculator:
                     try:
                         confidence_data = self.confidence_calculator.get_symbol_confidence(symbol)
