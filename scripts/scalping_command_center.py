@@ -515,9 +515,13 @@ class ScalpingCommandCenter:
             
             tk.Label(header, text=symbol, font=('Arial', 10, 'bold'),
                     bg=self.colors['bg_tertiary'], fg=self.colors['fg_primary']).pack(side=tk.LEFT)
-            tk.Label(header, textvariable=self.strategy_vars[symbol]['status'],
+            
+            # Store status label for dynamic color changes
+            status_label = tk.Label(header, textvariable=self.strategy_vars[symbol]['status'],
                     font=('Arial', 8, 'bold'), bg=self.colors['bg_tertiary'],
-                    fg=self.colors['fg_info']).pack(side=tk.RIGHT)
+                    fg=self.colors['fg_info'])
+            status_label.pack(side=tk.RIGHT)
+            self.strategy_vars[symbol]['status_label'] = status_label
             
             # Stock metrics
             metrics = tk.Frame(stock_frame, bg=self.colors['bg_tertiary'])
@@ -682,19 +686,45 @@ class ScalpingCommandCenter:
         """Main data update loop running in background thread"""
         while self.is_running:
             try:
-                self.fetch_account_data()
-                self.fetch_confidence_data()
-                self.fetch_trade_data()
-                self.fetch_strategy_performance()
+                # Always check market status first
                 self.fetch_market_status()
-                self.fetch_bot_health()
+                
+                # Check if market is open
+                market_is_open = self.market_status.get('session_status') == 'OPEN'
+                
+                if market_is_open:
+                    # Market is open - fetch all data frequently
+                    self.fetch_account_data()
+                    self.fetch_confidence_data()
+                    self.fetch_trade_data()
+                    self.fetch_strategy_performance()
+                    self.fetch_bot_health()
+                    
+                    sleep_time = self.refresh_rate  # 2 seconds
+                    self.logger.debug("📊 Market open - full data refresh")
+                else:
+                    # Market is closed - only fetch static data less frequently
+                    self.fetch_bot_health()  # Still show uptime and system health
+                    
+                    # Only fetch trading data every 30 seconds when market is closed
+                    current_time = datetime.now()
+                    if not hasattr(self, 'last_trading_data_update'):
+                        self.last_trading_data_update = current_time
+                    
+                    if (current_time - self.last_trading_data_update).seconds >= 30:
+                        self.fetch_account_data()  # Check for any overnight changes
+                        self.last_trading_data_update = current_time
+                        self.logger.debug("📊 Market closed - limited data refresh")
+                    
+                    sleep_time = 10  # Sleep longer when market is closed
                 
                 self.last_update = datetime.now()
                 
             except Exception as e:
                 self.logger.error(f"Error in update loop: {e}")
+                sleep_time = self.refresh_rate
                 
-            time.sleep(self.refresh_rate)
+            time.sleep(sleep_time)
             
     def fetch_account_data(self):
         """Fetch account and P&L data"""
@@ -869,10 +899,10 @@ class ScalpingCommandCenter:
     def fetch_trade_data(self):
         """Fetch recent trade execution data"""
         try:
-            # First try to get real trade data from Alpaca
+            # First try to get real trade data from Alpaca (uses best available - recent or historical)
             if self.has_real_data and hasattr(self, 'alpaca_connector') and self.alpaca_connector:
                 try:
-                    # Get real trades from Alpaca paper trading account
+                    # Get best available trades from Alpaca (smart selection based on market state)
                     real_trades = get_real_trade_history(hours_back=24)
                     
                     if real_trades:
@@ -897,11 +927,11 @@ class ScalpingCommandCenter:
                         if len(self.trade_alerts) > 100:
                             self.trade_alerts = self.trade_alerts[-100:]
                             
-                        self.logger.info(f"📊 Updated with {len(real_trades)} real trades from Alpaca")
+                        self.logger.info(f"📊 Updated with {len(real_trades)} real trades from Alpaca (best available data)")
                         return
                         
                     else:
-                        self.logger.info("📊 No recent trades found in Alpaca account")
+                        self.logger.info("📊 No trades found in Alpaca account (recent or historical)")
                         
                 except Exception as e:
                     self.logger.warning(f"Could not fetch real Alpaca trades: {e}")
@@ -966,10 +996,10 @@ class ScalpingCommandCenter:
     def fetch_strategy_performance(self):
         """Fetch strategy performance metrics by stock"""
         try:
-            # First try to get real strategy performance from Alpaca
+            # First try to get real strategy performance from Alpaca (uses best available data)
             if self.has_real_data and hasattr(self, 'alpaca_connector') and self.alpaca_connector:
                 try:
-                    # Get real performance data from Alpaca
+                    # Get real performance data from Alpaca (smart selection based on market state)
                     real_performance = get_real_strategy_performance(hours_back=24)
                     
                     if real_performance:
@@ -983,7 +1013,7 @@ class ScalpingCommandCenter:
                                 'best_strategy': perf_data['best_strategy']
                             }
                         
-                        self.logger.info(f"📊 Updated strategy performance with real data for {len(real_performance)} symbols")
+                        self.logger.info(f"📊 Updated strategy performance with real data for {len(real_performance)} symbols (best available data)")
                         
                         # Fill in any missing symbols with default data
                         for symbol in SYMBOLS:
@@ -999,7 +1029,7 @@ class ScalpingCommandCenter:
                         return
                         
                     else:
-                        self.logger.info("📊 No recent trading activity found in Alpaca account")
+                        self.logger.info("📊 No trading activity found in Alpaca account (recent or historical)")
                         
                 except Exception as e:
                     self.logger.warning(f"Could not fetch real strategy performance: {e}")
@@ -1052,11 +1082,30 @@ class ScalpingCommandCenter:
                             else:
                                 best_strategy = "HOLD Pattern"
                                 
-                            # Adjust status based on confidence
-                            if confidence > 70:
-                                status = "ACTIVE"
-                            elif confidence > 50:
-                                status = "MODERATE"
+                            # Determine status based on market conditions, positions, and activity
+                            market_is_open = self.market_status.get('session_status') == 'OPEN'
+                            has_position = False
+                            has_recent_activity = trades_count > 0
+                            
+                            # Check if there's an open position for this symbol
+                            if hasattr(self, 'positions') and self.positions:
+                                for pos in self.positions:
+                                    if pos.get('symbol') == symbol and float(pos.get('qty', 0)) != 0:
+                                        has_position = True
+                                        break
+                            
+                            # Status logic: Consider market, positions, and activity
+                            if not market_is_open:
+                                if has_recent_activity and confidence > 60:
+                                    status = "DORMANT"  # Had activity but market closed
+                                else:
+                                    status = "INACTIVE"
+                            elif has_position:
+                                status = "ACTIVE"  # Market open + position = active
+                            elif has_recent_activity and confidence > 70:
+                                status = "ACTIVE"  # Market open + recent activity + high confidence
+                            elif confidence > 60:
+                                status = "MODERATE"  # Market open + decent confidence
                             else:
                                 status = "INACTIVE"
                     except:
@@ -1089,8 +1138,8 @@ class ScalpingCommandCenter:
                 time_to_open = "Market Open"
             else:
                 session_status = "CLOSED"
-                # Calculate time to next open
-                time_to_open = "06:30:00"  # Simplified
+                # Calculate actual time to next market open
+                time_to_open = self.calculate_time_to_open(now, market_open)
                 
             self.market_status = {
                 'session_status': session_status,
@@ -1103,6 +1152,35 @@ class ScalpingCommandCenter:
             
         except Exception as e:
             self.logger.error(f"Error fetching market status: {e}")
+    
+    def calculate_time_to_open(self, now, market_open):
+        """Calculate actual time remaining until market opens"""
+        try:
+            # Create datetime for next market open
+            next_open = datetime.combine(now.date(), market_open)
+            
+            # If market open time has passed today, use tomorrow
+            if now.time() > market_open:
+                next_open += timedelta(days=1)
+            
+            # Skip weekends - if next open is Saturday, move to Monday
+            while next_open.weekday() >= 5:  # 5=Saturday, 6=Sunday
+                next_open += timedelta(days=1)
+            
+            # Calculate time difference
+            time_diff = next_open - now
+            
+            # Format as HH:MM:SS
+            total_seconds = int(time_diff.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60
+            
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating time to open: {e}")
+            return "00:00:00"
             
     def fetch_bot_health(self):
         """Fetch bot health metrics"""
@@ -1262,13 +1340,39 @@ class ScalpingCommandCenter:
                 
                 self.strategy_vars[symbol]['win_rate'].set(f"{data['win_rate']:.1f}%")
                 self.strategy_vars[symbol]['status'].set(data['status'])
+                
+                # Update status color based on status
+                status_color = self.get_status_color(data['status'])
+                if 'status_label' in self.strategy_vars[symbol]:
+                    self.strategy_vars[symbol]['status_label'].config(fg=status_color)
+                
                 self.strategy_vars[symbol]['best_strategy'].set(data['best_strategy'])
+    
+    def get_status_color(self, status: str) -> str:
+        """Get color for status display"""
+        status_colors = {
+            'ACTIVE': '#00ff00',      # Bright green
+            'MODERATE': '#ffaa00',    # Orange  
+            'DORMANT': '#6666ff',     # Blue
+            'INACTIVE': '#666666'     # Gray
+        }
+        return status_colors.get(status, '#666666')
                 
     def update_market_display(self):
         """Update market status panel"""
         if self.market_status:
             self.market_vars['session_status'].set(self.market_status['session_status'])
-            self.market_vars['time_to_open'].set(self.market_status['time_to_open'])
+            
+            # Recalculate countdown every second for live timer
+            if self.market_status['session_status'] == 'CLOSED':
+                from datetime import time
+                now = datetime.now()
+                market_open = time(9, 30)
+                live_countdown = self.calculate_time_to_open(now, market_open)
+                self.market_vars['time_to_open'].set(live_countdown)
+            else:
+                self.market_vars['time_to_open'].set(self.market_status['time_to_open'])
+            
             self.market_vars['spy_price'].set(f"${self.market_status['spy_price']:.2f}")
             
             spy_change = self.market_status['spy_change']
@@ -1294,7 +1398,7 @@ class ScalpingCommandCenter:
             self.bot_status_var.set("🟢 ACTIVE")
             self.market_status_var.set("📊 MARKET OPEN")
         else:
-            self.bot_status_var.set("🟡 STANDBY")
+            self.bot_status_var.set("🟡 STANDBY (LOW-POLLING)")
             self.market_status_var.set("📊 MARKET CLOSED")
             
         self.connection_status_var.set("🟢 CONNECTED")
@@ -1334,7 +1438,7 @@ class ScalpingCommandCenter:
         except Exception as e:
             self.logger.error(f"Error during force refresh: {e}")
             self.status_var.set("❌ Error during refresh")
-            
+
     def toggle_fullscreen(self):
         """Toggle fullscreen mode"""
         self.is_fullscreen = not self.is_fullscreen
@@ -1375,6 +1479,11 @@ class ScalpingCommandCenter:
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to export data: {e}")
             
+    def show_message(self, title: str, message: str):
+        """Show a message dialog"""
+        import tkinter.messagebox as msgbox
+        msgbox.showinfo(title, message)
+
     def launch_streamlit(self):
         """Launch Streamlit dashboard"""
         try:
