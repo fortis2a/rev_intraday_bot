@@ -1,121 +1,60 @@
-# Workspace Cleanup Summary
+# 🗂️ Scalping Bot System - Cleanup Summary
 
-## 🧹 **WORKSPACE CLEANED UP SUCCESSFULLY!**
-
-### ✅ **Files Removed (Development/Testing Files):**
-
-#### Temporary Test Files:
-- ❌ `test_timer.py` - Timer functionality testing
-- ❌ `test_option_5.py` - Option 5 functionality testing
-- ❌ `test_market_status.py` - Market status detection testing
-
-#### Demo Files:
-- ❌ `demo_timer_features.py` - Timer features demonstration
-- ❌ `demo_option_5.py` - Option 5 enhancement demo
-- ❌ `demo_auto_sleep_wake.py` - Auto sleep/wake system demo
-- ❌ `live_timer_demo.py` - Live timer standalone demo
-
-#### Cache Files:
-- ❌ `__pycache__/` directories (recursively cleaned)
-- ❌ `*.pyc` compiled Python files
-
-### ✅ **Files Kept (Production/Legitimate Files):**
-
-#### Core System Files:
-- ✅ `launcher.py` - Main launcher with enhanced features
-- ✅ `main.py` - Trading engine with auto sleep/wake
-- ✅ `config.py` - System configuration
-- ✅ `data_manager.py` - Market data management
-- ✅ `order_manager.py` - Order execution
-- ✅ `stock_specific_config.py` - Stock-specific settings
-- ✅ `strategies.py` - Trading strategies
-- ✅ `logger.py` - Logging system
-
-#### Enhanced Core Components:
-- ✅ `core/auto_sleep_wake.py` - Auto sleep/wake system
-- ✅ `core/real_time_confidence.py` - Real-time confidence calculator
-- ✅ `core/trailing_stop_manager.py` - Trailing stop management
-
-#### Legitimate Test Files (Kept):
-- ✅ `tests/test_*.py` - Official test suite
-- ✅ `scripts/test_*.py` - Confidence system tests
-
-#### Documentation:
-- ✅ `docs/` - All documentation files
-- ✅ `README.md` - Project documentation
-
-#### Configuration & Data:
-- ✅ `logs/` - Operational logs (valuable history)
-- ✅ `reports/` - Trading reports
-- ✅ `scripts/` - Utility scripts
-- ✅ `.env` - Environment configuration
-- ✅ `requirements.txt` - Dependencies
-
-## 🛡️ **Prevention Measures Added:**
-
-### Updated .gitignore:
-Added patterns to prevent future temporary files:
-```ignore
-# Temporary development files
-test_*.py
-demo_*.py
-*_demo.py
-temp_*.py
-tmp_*.py
-debug_*.py
-
-# Exclude legitimate test files
-!tests/test_*.py
-!scripts/test_*.py
-```
-
-## 📊 **Final Workspace Structure:**
-
-```
-📁 Scalping Bot System/
-├── 🚀 launcher.py (Enhanced with timer + auto sleep/wake)
-├── ⚙️ main.py (Integrated with auto sleep/wake)
-├── 📋 config.py
-├── 📊 data_manager.py
-├── 💰 order_manager.py
-├── 🎯 stock_specific_config.py
-├── 📈 strategies.py
-├── 📝 logger.py
-├── 📁 core/
-│   ├── 🌙 auto_sleep_wake.py (NEW)
-│   ├── 🎯 real_time_confidence.py
-│   └── 🛡️ trailing_stop_manager.py
-├── 📁 scripts/ (Utility scripts)
-├── 📁 tests/ (Official test suite)
-├── 📁 docs/ (Complete documentation)
-├── 📁 logs/ (Operational logs)
-├── 📁 reports/ (Trading reports)
-├── 🔧 requirements.txt
-└── 🔒 .env
-```
-
-## 🎯 **Clean Workspace Benefits:**
-
-✅ **Clarity** - Only essential files remain  
-✅ **Organization** - Clear separation of production vs. test code  
-✅ **Maintenance** - Easier to navigate and maintain  
-✅ **Version Control** - Clean git history without temp files  
-✅ **Performance** - Reduced file system clutter  
-
-## 🚀 **Ready for Production:**
-
-The workspace is now **clean and organized** with:
-- All timer functionality integrated into production code
-- Auto sleep/wake system ready for 24/7 operation
-- Comprehensive documentation available
-- No temporary or development files cluttering the workspace
-
-### Next Steps:
-1. **Production Use**: `python launcher.py`
-2. **Auto Sleep/Wake**: Select option 15
-3. **Monitor Logs**: Check `/logs/` for system activity
-4. **Documentation**: Refer to `/docs/` for detailed guides
+**Date:** August 18, 2025  
+**Cleanup Session:** Archive Outdated Analysis Scripts
 
 ---
-*Cleanup completed: August 13, 2025*
-*Workspace Status: ✅ CLEAN & READY*
+
+## 📁 Files Archived
+
+### ✅ **analyze_after_hours_positions.py** 
+- **Status:** Archived to `archive/`
+- **Reason:** Functionality superseded by better tools
+- **Replaced By:** 
+  - `close_trade.py` (position management)
+  - `scripts/scalping_command_center.py` (real-time monitoring)
+  - `docs/AFTER_HOURS_POSITION_MANAGEMENT.md` (comprehensive guide)
+
+---
+
+## 🔄 **Replacement Mapping**
+
+| **Old Functionality** | **New Solution** |
+|----------------------|------------------|
+| Position listing | `python close_trade.py --list` |
+| Market status check | Command Center GUI |
+| Bot behavior analysis | Documentation in `docs/` |
+| After-hours recommendations | `docs/TRADE_CLOSING_GUIDE.md` |
+| Position closure options | `python close_trade.py --interactive` |
+
+---
+
+## 🎯 **Benefits of Cleanup**
+
+- ✅ **Reduced Complexity**: Fewer duplicate scripts to maintain
+- ✅ **Better UX**: Unified tools instead of scattered utilities  
+- ✅ **Current Dependencies**: No reliance on potentially outdated imports
+- ✅ **Comprehensive Documentation**: Better guides than inline help text
+
+---
+
+## 📞 **If You Need After-Hours Analysis**
+
+**Use These Instead:**
+```powershell
+# Quick position check
+python close_trade.py --list
+
+# Interactive position management
+python close_trade.py --interactive
+
+# Real-time monitoring
+python scripts/scalping_command_center.py
+
+# Read comprehensive guide
+Get-Content docs/AFTER_HOURS_POSITION_MANAGEMENT.md
+```
+
+---
+
+**✅ Cleanup Complete**: System is now more streamlined with better tooling.
