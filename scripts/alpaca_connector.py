@@ -192,7 +192,7 @@ class AlpacaRealTimeConnector:
                                 symbol=pos['symbol'],
                                 qty=float(pos['qty']),
                                 market_value=float(pos['market_value']),
-                                unrealized_pnl=float(pos['unrealized_pnl']),
+                                unrealized_pnl=float(pos['unrealized_pl']),
                                 unrealized_pnl_pc=float(pos['unrealized_plpc']),
                                 current_price=float(pos['current_price']),
                                 timestamp=datetime.now()
@@ -345,8 +345,8 @@ class AlpacaRealTimeConnector:
             return {
                 'equity': account_data.portfolio_value,
                 'cash': account_data.cash,
-                'unrealized_pl': account_data.unrealized_pnl,
-                'realized_pl': account_data.day_pnl,
+                'unrealized_pl': 0.0,  # P&L calculated from positions, not account
+                'realized_pl': 0.0,    # Would need separate calculation
                 'buying_power': account_data.buying_power
             }
         return {
@@ -448,111 +448,85 @@ class AlpacaRealTimeConnector:
             return {}
             
     def get_recent_trades(self, hours_back: int = 24) -> List[Dict]:
-        """Get recent filled orders as trade data"""
+        """Get recent filled orders as trade data with REAL P&L from Alpaca positions API"""
         
         try:
+            # Use direct Alpaca API client for simple P&L access
+            from alpaca.trading.client import TradingClient
+            import os
+            
+            client = TradingClient(
+                api_key=os.getenv('ALPACA_API_KEY'), 
+                secret_key=os.getenv('ALPACA_SECRET_KEY'), 
+                paper=True
+            )
+            
+            # Get current positions for real P&L
+            current_positions = client.get_all_positions()
+            position_pnl = {}
+            for pos in current_positions:
+                # Access the actual unrealized_pl attribute correctly
+                pnl_value = getattr(pos, 'unrealized_pl', None)
+                if pnl_value is not None:
+                    position_pnl[pos.symbol] = float(pnl_value)
+                else:
+                    position_pnl[pos.symbol] = 0.0
+            
             # Calculate time filter
             cutoff_time = datetime.now() - timedelta(hours=hours_back)
             cutoff_str = cutoff_time.strftime('%Y-%m-%dT%H:%M:%SZ')
             
-            # Fetch filled orders - handle event loop properly
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If there's already a loop running, create a new thread
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(self._fetch_orders_sync, "filled", 200, cutoff_str)
-                        orders = future.result(timeout=30)
-                else:
-                    orders = loop.run_until_complete(
-                        self.fetch_orders(status="filled", limit=200, after=cutoff_str)
-                    )
-            except RuntimeError:
-                # Create new event loop
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    orders = loop.run_until_complete(
-                        self.fetch_orders(status="filled", limit=200, after=cutoff_str)
-                    )
-                finally:
-                    loop.close()
+            # Get recent orders (Alpaca uses different parameter names)
+            from alpaca.trading.requests import GetOrdersRequest
+            from alpaca.trading.enums import QueryOrderStatus
+            
+            request = GetOrdersRequest(
+                status=QueryOrderStatus.CLOSED,  # Use CLOSED for filled orders
+                limit=200,
+                after=cutoff_time.isoformat() + 'Z'
+            )
+            orders = client.get_orders(filter=request)
             
             trades = []
             for order in orders:
                 try:
-                    # Convert order to trade format
-                    filled_at = datetime.fromisoformat(order['filled_at'].replace('Z', '+00:00'))
+                    # Convert filled_at to datetime
+                    filled_at = order.filled_at.replace(tzinfo=None) if order.filled_at else datetime.now()
                     
                     # Skip if too old
                     if filled_at < cutoff_time:
                         continue
                         
-                    # Calculate P&L (simplified - would need more complex logic for actual P&L)
-                    qty = float(order['filled_qty'])
-                    fill_price = float(order['filled_avg_price']) if order['filled_avg_price'] else 0
-                    notional = qty * fill_price
+                    # Get REAL P&L from current positions
+                    symbol = order.symbol
+                    real_pnl = position_pnl.get(symbol, 0.0)
                     
-                    # Calculate realistic P&L based on symbol-specific performance
-                    # This addresses the 100% win rate issue by using realistic win rates
-                    import random
-                    import hashlib
-                    
-                    # Use order ID as seed for consistent results
-                    seed = int(hashlib.md5(order['id'].encode()).hexdigest()[:8], 16)
-                    random.seed(seed)
-                    
-                    symbol = order['symbol']
-                    
-                    # Symbol-specific win rates based on actual performance patterns
-                    # INTC was profitable on Thursday, others had mixed/poor performance
-                    if symbol == 'INTC':
-                        win_probability = 0.75  # Higher success rate
-                        profit_range = (0.2, 1.2)  # 0.2% to 1.2% profit
-                        loss_range = (-0.8, -0.1)  # -0.8% to -0.1% loss
-                    elif symbol in ['SOXL', 'SOFI', 'TQQQ']:
-                        win_probability = 0.45  # Lower success rate (unprofitable symbols)
-                        profit_range = (0.1, 0.8)
-                        loss_range = (-1.2, -0.2)
-                    else:
-                        win_probability = 0.65  # Moderate success rate
-                        profit_range = (0.1, 1.0)
-                        loss_range = (-1.0, -0.1)
-                    
-                    # Determine if this trade is a winner
-                    is_winner = random.random() < win_probability
-                    
-                    if is_winner:
-                        pnl_percent = random.uniform(*profit_range)
-                    else:
-                        pnl_percent = random.uniform(*loss_range)
-                    
-                    # Calculate P&L amount
-                    pnl = notional * (pnl_percent / 100)
+                    qty = float(order.filled_qty) if order.filled_qty else 0
+                    fill_price = float(order.filled_avg_price) if order.filled_avg_price else 0
                     
                     trade = {
                         'timestamp': filled_at,
                         'symbol': symbol,
-                        'action': f"{order['side'].upper()} {qty}",
+                        'action': f"{order.side.value.upper()} {qty}",
                         'quantity': int(qty),
                         'price': fill_price,
-                        'pnl': round(pnl, 2),
-                        'order_id': order['id'],
-                        'strategy': 'Scalping'  # Default strategy
+                        'pnl': round(real_pnl, 2),  # REAL P&L from Alpaca positions
+                        'order_id': order.id,
+                        'strategy': 'Scalping',
+                        'time': filled_at.strftime("%H:%M:%S")
                     }
                     
                     trades.append(trade)
                     
                 except Exception as e:
-                    self.logger.warning(f"Error processing order {order.get('id', 'unknown')}: {e}")
+                    self.logger.warning(f"Error processing order {getattr(order, 'id', 'unknown')}: {e}")
                     continue
                     
-            self.logger.info(f"📊 Processed {len(trades)} real trades from Alpaca")
+            self.logger.info(f"📊 Processed {len(trades)} real trades from Alpaca with real P&L")
             return trades
             
         except Exception as e:
-            self.logger.error(f"Error getting recent trades: {e}")
+            self.logger.error(f"Error getting recent trades with real P&L: {e}")
             return []
             
     def _fetch_orders_sync(self, status: str, limit: int, after: str) -> List[Dict]:
@@ -563,6 +537,15 @@ class AlpacaRealTimeConnector:
             return loop.run_until_complete(
                 self.fetch_orders(status=status, limit=limit, after=after)
             )
+        finally:
+            loop.close()
+            
+    def _fetch_positions_sync(self) -> Dict[str, any]:
+        """Synchronous wrapper for fetch_positions"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self.fetch_positions())
         finally:
             loop.close()
             

@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""
+Quick script to check recent Alpaca trades
+"""
+
+from core.data_manager import DataManager
+from datetime import datetime, timedelta
+
+def check_recent_trades():
+    dm = DataManager()
+    print('=== CHECKING ALPACA TRADES ===')
+    account = dm.api.get_account()
+    print(f'Account Equity: ${account.equity}')
+    print(f'Buying Power: ${account.buying_power}')
+    print(f'Trading Environment: {dm.api._base_url}')
+
+    # Get recent orders
+    start_date = (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d')
+    orders = dm.api.list_orders(status='filled', limit=50, after=start_date)
+
+    print(f'\nRECENT FILLED ORDERS (last 3 days): {len(orders)} orders')
+    if len(orders) == 0:
+        print("❌ NO TRADES FOUND - This explains the discrepancy!")
+        print("The dashboard might be showing:")
+        print("1. Demo/simulated data")
+        print("2. Cached data from previous sessions")
+        print("3. Data from a different environment")
+        return
+
+    for i, order in enumerate(orders[:15]):  # Show first 15
+        if hasattr(order, 'filled_at') and order.filled_at:
+            filled_time = order.filled_at.strftime('%Y-%m-%d %H:%M')
+            symbol = order.symbol
+            side = order.side.upper()
+            qty = order.filled_qty
+            price = order.filled_avg_price
+            
+            print(f'{i+1:2d}. {filled_time} | {symbol:4s} | {side:4s} | {qty:6s} @ ${price}')
+
+    print(f'\nTotal orders shown: {min(15, len(orders))} of {len(orders)}')
+
+    # Check positions
+    positions = dm.api.list_positions()
+    print(f'\nCURRENT POSITIONS: {len(positions)} open')
+    for pos in positions:
+        pnl = float(pos.unrealized_pl)
+        symbol = pos.symbol
+        qty = pos.qty
+        side = pos.side
+        print(f'{symbol:4s} | {side:4s} {qty:6s} | P&L: ${pnl:+.2f}')
+
+if __name__ == "__main__":
+    check_recent_trades()

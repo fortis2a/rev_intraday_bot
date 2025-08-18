@@ -897,41 +897,47 @@ class ScalpingCommandCenter:
             self.logger.error(f"Error fetching confidence data: {e}")
             
     def fetch_trade_data(self):
-        """Fetch recent trade execution data"""
+        """Fetch recent trade execution data - REAL TRADES ONLY (no fake P&L)"""
         try:
+            # CLEAR ALL EXISTING FAKE TRADES
+            self.trade_alerts = []
+            
             # First try to get real trade data from Alpaca (uses best available - recent or historical)
             if self.has_real_data and hasattr(self, 'alpaca_connector') and self.alpaca_connector:
                 try:
-                    # Get best available trades from Alpaca (smart selection based on market state)
-                    real_trades = get_real_trade_history(hours_back=24)
+                    # Use the alpaca_connector's get_recent_trades method (already processing 4 real trades!)
+                    recent_trades = self.alpaca_connector.get_recent_trades(hours_back=24)
                     
-                    if real_trades:
-                        # Convert Alpaca trade format to display format
-                        for trade_data in real_trades:
+                    if recent_trades:
+                        # The alpaca_connector already returns properly formatted trade data
+                        # Convert to alerts format
+                        for trade_data in recent_trades:
+                            # Convert timestamp to time string if needed
+                            time_str = trade_data.get('time', datetime.now().strftime("%H:%M:%S"))
+                            if 'timestamp' in trade_data and not time_str:
+                                timestamp = trade_data['timestamp']
+                                if isinstance(timestamp, datetime):
+                                    time_str = timestamp.strftime("%H:%M:%S")
+                                else:
+                                    time_str = datetime.now().strftime("%H:%M:%S")
+                            
                             trade = {
-                                'time': trade_data['timestamp'].strftime("%H:%M:%S"),
-                                'symbol': trade_data['symbol'],
-                                'action': trade_data['action'],
-                                'quantity': trade_data['quantity'],
-                                'price': trade_data['price'],
-                                'pnl': trade_data['pnl'],
-                                'strategy': trade_data['strategy']
+                                'time': time_str,
+                                'symbol': trade_data.get('symbol', 'UNKNOWN'),
+                                'action': trade_data.get('action', 'UNKNOWN'),
+                                'quantity': trade_data.get('quantity', 0),
+                                'price': trade_data.get('price', 0.0),
+                                'pnl': trade_data.get('pnl', 0.0),
+                                'strategy': trade_data.get('strategy', 'Scalping')
                             }
                             
-                            # Add to alerts if not already present
-                            if not any(t['time'] == trade['time'] and t['symbol'] == trade['symbol'] 
-                                     and t['action'] == trade['action'] for t in self.trade_alerts):
-                                self.trade_alerts.append(trade)
-                        
-                        # Keep only last 100 trades
-                        if len(self.trade_alerts) > 100:
-                            self.trade_alerts = self.trade_alerts[-100:]
+                            self.trade_alerts.append(trade)
                             
-                        self.logger.info(f"📊 Updated with {len(real_trades)} real trades from Alpaca (best available data)")
+                        self.logger.info(f"📊 Updated with {len(recent_trades)} REAL trades from Alpaca (no fake data)")
                         return
                         
                     else:
-                        self.logger.info("📊 No trades found in Alpaca account (recent or historical)")
+                        self.logger.info("📊 No real trades found in Alpaca account")
                         
                 except Exception as e:
                     self.logger.warning(f"Could not fetch real Alpaca trades: {e}")

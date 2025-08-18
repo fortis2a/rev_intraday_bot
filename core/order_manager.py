@@ -445,3 +445,172 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"[ERROR] Failed to get open orders: {e}")
             return []
+
+    def place_short_order(self, symbol, signal_data):
+        """Place a short sell order (sell to open position)"""
+        try:
+            # Check if short selling is enabled
+            if not config.get('ENABLE_SHORT_SELLING', False):
+                self.logger.info(f"[SKIP] Short selling disabled for {symbol}")
+                return None
+            
+            # Check if symbol is allowed for short selling
+            allowed_stocks = config.get('SHORT_SELLING_STOCKS', [])
+            if symbol not in allowed_stocks:
+                self.logger.info(f"[SKIP] {symbol} not in short selling allowed list")
+                return None
+            
+            # Check cooldown
+            if not self.is_trading_allowed(symbol):
+                return None
+            
+            # Check if we already have a short position
+            positions = self.data_manager.get_positions()
+            existing_position = next((p for p in positions if p['symbol'] == symbol and p['side'] == 'short'), None)
+            if existing_position:
+                self.logger.info(f"[SKIP] Already short {symbol}")
+                return None
+            
+            # Check confidence requirement for short selling
+            min_confidence = config.get('SHORT_SELLING_MIN_CONFIDENCE', 75.0)
+            signal_confidence = signal_data.get('confidence', 0) * 100
+            if signal_confidence < min_confidence:
+                self.logger.info(f"[SKIP] Short confidence too low: {signal_confidence:.1f}% < {min_confidence}%")
+                return None
+            
+            # Get current price and account info
+            current_price = self.data_manager.get_current_price(symbol)
+            account_info = self.data_manager.get_account_info()
+            
+            if not current_price or not account_info:
+                self.logger.error(f"[ERROR] Could not get price/account data for {symbol}")
+                return None
+            
+            # Calculate position size for short selling
+            max_short_position = config.get('SHORT_SELLING_MAX_POSITION_SIZE', 500)
+            shares = int(min(max_short_position, account_info['equity'] * 0.01) / current_price)  # 1% of equity max
+            
+            if shares < 1:
+                self.logger.warning(f"[WARNING] Position size too small for {symbol}: {shares} shares")
+                return None
+            
+            # Get stock-specific thresholds for short selling
+            thresholds = self.get_stock_thresholds(symbol)
+            
+            # Calculate stop loss (above current price for shorts) and take profit (below current price)
+            stop_loss_price = round_to_cent(current_price * (1 + thresholds['stop_loss_pct']))
+            take_profit_price = round_to_cent(current_price * (1 - thresholds['take_profit_pct']))
+            
+            required_cash = shares * current_price
+            
+            # Check buying power (for margin requirements)
+            if required_cash > account_info['buying_power'] * 0.5:  # Conservative margin usage
+                self.logger.warning(f"[WARNING] Insufficient buying power for short {symbol}")
+                return None
+            
+            self.logger.info(f"[ORDER] Placing SHORT order for {symbol}")
+            self.logger.info(f"[ORDER] Shares: {shares}, Price: ${current_price:.2f}")
+            self.logger.info(f"[ORDER] Stop Loss: ${stop_loss_price:.2f} ({thresholds['stop_loss_pct']*100:.2f}%)")
+            self.logger.info(f"[ORDER] Take Profit: ${take_profit_price:.2f} ({thresholds['take_profit_pct']*100:.2f}%)")
+            self.logger.info(f"[ORDER] Strategy: {signal_data.get('strategy', 'Unknown')}, "
+                           f"Confidence: {signal_confidence:.1f}%")
+            
+            # Place market short order (sell to open)
+            order = self.api.submit_order(
+                symbol=symbol,
+                qty=shares,
+                side='sell',  # Sell to open short position
+                type='market',
+                time_in_force='day'
+            )
+            
+            self.logger.info(f"[SUCCESS] Short order placed - Order ID: {order.id}")
+            
+            # Update last trade time for cooldown tracking
+            self.update_last_trade_time(symbol)
+            
+            # Add position to trailing stop manager with short-specific settings
+            self.trailing_stop_manager.add_position(
+                symbol=symbol,
+                entry_price=current_price,
+                quantity=-shares,  # Negative quantity for short positions
+                side='short',
+                initial_stop_price=stop_loss_price,
+                custom_thresholds=thresholds
+            )
+            
+            # Place stop loss order (buy to cover when price goes up)
+            try:
+                stop_order = self.api.submit_order(
+                    symbol=symbol,
+                    qty=shares,
+                    side='buy',  # Buy to cover short position
+                    type='stop',
+                    stop_price=stop_loss_price,
+                    time_in_force='day'
+                )
+                self.logger.info(f"[SUCCESS] Short stop loss order placed - Order ID: {stop_order.id}")
+                
+            except Exception as stop_error:
+                self.logger.error(f"[ERROR] Failed to place stop loss for short {symbol}: {stop_error}")
+            
+            return {
+                'order_id': order.id,
+                'symbol': symbol,
+                'side': 'short',
+                'qty': shares,
+                'price': current_price,
+                'stop_loss': stop_loss_price,
+                'take_profit': take_profit_price,
+                'confidence': signal_confidence
+            }
+            
+        except Exception as e:
+            self.logger.error(f"[ERROR] Failed to place short order for {symbol}: {e}")
+            return None
+
+    def place_cover_order(self, symbol, qty=None):
+        """Place a buy-to-cover order to close short position"""
+        try:
+            # Get current short position if qty not specified
+            if qty is None:
+                positions = self.data_manager.get_positions()
+                position = next((p for p in positions if p['symbol'] == symbol and p['side'] == 'short'), None)
+                
+                if not position:
+                    self.logger.warning(f"[WARNING] No short position found for {symbol}")
+                    return None
+                
+                qty = abs(int(position['qty']))
+            
+            # Get current price
+            current_price = self.data_manager.get_current_price(symbol)
+            if not current_price:
+                self.logger.error(f"[ERROR] Could not get current price for {symbol}")
+                return None
+            
+            self.logger.info(f"[ORDER] Placing BUY-TO-COVER order for {symbol}")
+            self.logger.info(f"[ORDER] Shares: {qty}, Price: ${current_price:.2f}")
+            
+            # Place market buy order to cover short
+            order = self.api.submit_order(
+                symbol=symbol,
+                qty=qty,
+                side='buy',  # Buy to cover short position
+                type='market',
+                time_in_force='day'
+            )
+            
+            self.logger.info(f"[SUCCESS] Cover order placed - Order ID: {order.id}")
+            
+            return {
+                'order_id': order.id,
+                'symbol': symbol,
+                'side': 'cover',
+                'qty': qty,
+                'price': current_price
+            }
+            
+        except Exception as e:
+            self.logger.error(f"[ERROR] Failed to place cover order for {symbol}: {e}")
+            return None

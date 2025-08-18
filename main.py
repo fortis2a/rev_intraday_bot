@@ -32,11 +32,11 @@ class IntradayEngine:
         self.data_manager = DataManager()
         self.order_manager = OrderManager(self.data_manager)
         
-        # Initialize strategies
-        self.strategies = {
-            'momentum': MomentumStrategy(),
-            'mean_reversion': MeanReversionStrategy(),
-            'vwap': VWAPStrategy()
+        # Initialize strategy classes (will create instances per symbol)
+        self.strategy_classes = {
+            'momentum': MomentumStrategy,
+            'mean_reversion': MeanReversionStrategy,
+            'vwap': VWAPStrategy
         }
         
         # Trading state
@@ -44,6 +44,7 @@ class IntradayEngine:
         self.daily_pnl = 0.0
         self.trade_count = 0
         self.is_running = True
+        self.stocks_to_watch = {}  # Track overbought stocks for BUY opportunities
         
         # Get initial account info
         account_info = self.data_manager.get_account_info()
@@ -209,13 +210,20 @@ class IntradayEngine:
                     continue
                 
                 # Run each enhanced strategy
-                for strategy_name, strategy in self.strategies.items():
-                    signal = strategy.generate_signal(symbol, df)
-                    if signal:
-                        # Add strategy signal to list for processing
-                        # We'll check enhanced confidence later during execution
-                        signals.append(signal)
-                        self.logger.info(f"[STRATEGY SIGNAL] {strategy_name}: {signal['action']} {symbol} - {signal['reason']}")
+                for strategy_name, strategy_class in self.strategy_classes.items():
+                    try:
+                        # Create strategy instance for this symbol - ALL strategies need symbol
+                        strategy = strategy_class(symbol)
+                        
+                        signal = strategy.generate_signal(symbol, df)
+                        if signal:
+                            # Add strategy signal to list for processing
+                            # We'll check enhanced confidence later during execution
+                            signals.append(signal)
+                            self.logger.info(f"[STRATEGY SIGNAL] {strategy_name}: {signal['action']} {symbol} - {signal['reason']}")
+                    except Exception as strategy_error:
+                        self.logger.error(f"[ERROR] Strategy {strategy_name} failed for {symbol}: {strategy_error}")
+                        continue
                 
             except Exception as e:
                 self.logger.error(f"[ERROR] Failed to scan {symbol}: {e}")
@@ -243,32 +251,83 @@ class IntradayEngine:
             existing_position = next((p for p in positions if p['symbol'] == symbol), None)
             
             if action == 'BUY':
-                # Don't buy if we already have a long position
-                if existing_position and existing_position['side'] == 'long':
-                    self.logger.info(f"[SKIP] Already long {symbol}")
-                    return False
+                # Check if this was a watched stock (previously overbought)
+                was_watched = symbol in self.stocks_to_watch
+                watch_info = self.stocks_to_watch.get(symbol, {})
                 
-                # Place buy order with enhanced confidence data
-                order_result = self.order_manager.place_buy_order(symbol, signal)
-                if order_result:
-                    self.trade_count += 1
-                    self.active_positions[symbol] = order_result
-                    self.logger.info(f"[EXECUTED] Buy order for {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
-                    return True
-                
-            elif action == 'SELL':
-                # Only sell if we have a position
-                if existing_position and existing_position['side'] == 'long':
-                    order_result = self.order_manager.place_sell_order(symbol)
+                # Check if we have an existing position
+                if existing_position:
+                    if existing_position['side'] == 'long':
+                        self.logger.info(f"[SKIP] Already long {symbol}")
+                        return False
+                    elif existing_position['side'] == 'short':
+                        # Cover short position with BUY signal
+                        order_result = self.order_manager.place_cover_order(symbol)
+                        if order_result:
+                            self.trade_count += 1
+                            # Remove from active positions
+                            if symbol in self.active_positions:
+                                del self.active_positions[symbol]
+                            self.logger.info(f"[EXECUTED] ⚡ SHORT COVER: {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                            return True
+                else:
+                    # No position - place regular buy order
+                    order_result = self.order_manager.place_buy_order(symbol, signal)
                     if order_result:
                         self.trade_count += 1
-                        # Remove from active positions
-                        if symbol in self.active_positions:
-                            del self.active_positions[symbol]
-                        self.logger.info(f"[EXECUTED] Sell order for {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                        self.active_positions[symbol] = order_result
+                        
+                        # Enhanced logging for watched stocks
+                        if was_watched:
+                            self.logger.info(f"[EXECUTED] ⭐ PRIORITY BUY: {symbol} (was overbought, now oversold) - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                            # Remove from watch list
+                            del self.stocks_to_watch[symbol]
+                        else:
+                            self.logger.info(f"[EXECUTED] Buy order for {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
                         return True
+                
+            elif action == 'SELL':
+                # Check if we have an existing position
+                if existing_position:
+                    if existing_position['side'] == 'long':
+                        # Sell long position
+                        order_result = self.order_manager.place_sell_order(symbol)
+                        if order_result:
+                            self.trade_count += 1
+                            # Remove from active positions
+                            if symbol in self.active_positions:
+                                del self.active_positions[symbol]
+                            self.logger.info(f"[EXECUTED] Sell order for {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                            return True
+                    elif existing_position['side'] == 'short':
+                        self.logger.info(f"[SKIP] Already short {symbol}")
+                        return False
                 else:
-                    self.logger.info(f"[SKIP] No position to sell for {symbol}")
+                    # No position - try short selling if enabled
+                    from config import config
+                    if config.get('ENABLE_SHORT_SELLING', False):
+                        order_result = self.order_manager.place_short_order(symbol, signal)
+                        if order_result:
+                            self.trade_count += 1
+                            self.active_positions[symbol] = order_result
+                            self.logger.info(f"[EXECUTED] 🔴 SHORT SELL: {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                            return True
+                        else:
+                            # Short selling failed - add to watch list
+                            self.stocks_to_watch[symbol] = {
+                                'signal_time': datetime.now(),
+                                'reason': 'Short selling failed - watching for BUY opportunity',
+                                'confidence': trade_decision['confidence']
+                            }
+                            self.logger.info(f"[WATCH] {symbol} short failed - watching for BUY opportunity | Confidence: {trade_decision['confidence']:.1f}%")
+                    else:
+                        # Short selling disabled - add to watch list for potential BUY when oversold
+                        self.stocks_to_watch[symbol] = {
+                            'signal_time': datetime.now(),
+                            'reason': 'Was overbought - watching for BUY opportunity',
+                            'confidence': trade_decision['confidence']
+                        }
+                        self.logger.info(f"[WATCH] {symbol} overbought (no position) - watching for BUY opportunity | Confidence: {trade_decision['confidence']:.1f}%")
             
             return False
             
@@ -298,21 +357,29 @@ class IntradayEngine:
             self.logger.info(f"[CYCLE] Starting trading cycle #{self.trade_count + 1}")
             
             # Check market hours
+            self.logger.info(f"[DEBUG] Checking market hours...")
             if not self.is_market_hours():
                 self.logger.info("[INFO] Market is closed")
                 return
+            self.logger.info(f"[DEBUG] Market hours check passed")
             
             # Check risk limits
+            self.logger.info(f"[DEBUG] Checking risk limits...")
             if not self.check_risk_limits():
                 self.logger.warning("[RISK] Risk limits exceeded - stopping trading")
                 self.is_running = False
+                self.logger.warning(f"[DEBUG] Set is_running=False due to risk limits")
                 return
+            self.logger.info(f"[DEBUG] Risk limits check passed")
             
             # Update P&L
+            self.logger.info(f"[DEBUG] Updating P&L...")
             self.update_pnl()
+            self.logger.info(f"[DEBUG] P&L update completed")
             
             # Monitor trailing stops for existing positions
             if config['TRAILING_STOP_ENABLED']:
+                self.logger.info(f"[DEBUG] Checking trailing stops...")
                 triggered_positions = self.order_manager.check_trailing_stop_triggers()
                 if triggered_positions:
                     self.logger.info(f"[TRAILING] {len(triggered_positions)} positions closed by trailing stops")
@@ -320,9 +387,12 @@ class IntradayEngine:
                 # Log trailing stop summary every 10 cycles
                 if self.trade_count % 10 == 0:
                     self.order_manager.trailing_stop_manager.log_position_summary()
+                self.logger.info(f"[DEBUG] Trailing stops check completed")
             
             # Scan for signals
+            self.logger.info(f"[DEBUG] Scanning for signals...")
             signals = self.scan_for_signals()
+            self.logger.info(f"[DEBUG] Signal scan completed - found {len(signals)} signals")
             
             # Process signals with enhanced confidence check
             if not signals:
@@ -340,6 +410,7 @@ class IntradayEngine:
             
         except Exception as e:
             self.logger.error(f"[ERROR] Trading cycle failed: {e}")
+            self.logger.error(f"[DEBUG] Exception in trading_cycle, is_running still {self.is_running}")
     
     def run(self):
         """Main trading loop with market hours awareness"""
@@ -349,13 +420,21 @@ class IntradayEngine:
             cycle_count = 0
             
             while self.is_running:
+                self.logger.info(f"[DEBUG] Loop iteration {cycle_count + 1}, is_running={self.is_running}")
+                
                 # Check if market is open
                 if self.is_market_hours():
                     cycle_count += 1
                     self.logger.info(f"[LOOP] === Trading Cycle {cycle_count} ===")
                     
                     # Execute trading cycle
+                    self.logger.info(f"[DEBUG] About to call trading_cycle()")
                     self.trading_cycle()
+                    self.logger.info(f"[DEBUG] trading_cycle() completed, is_running={self.is_running}")
+                    
+                    if not self.is_running:
+                        self.logger.warning(f"[DEBUG] Engine stopped during trading_cycle - breaking loop")
+                        break
                     
                     # Sleep between cycles
                     self.logger.info(f"[WAIT] Waiting {config['CHECK_INTERVAL']} seconds until next cycle")
@@ -383,6 +462,7 @@ class IntradayEngine:
         except Exception as e:
             self.logger.error(f"[ERROR] Critical error in main loop: {e}")
         finally:
+            self.logger.info("[DEBUG] Exiting run() method - calling cleanup")
             self.cleanup()
     
     def cleanup(self):

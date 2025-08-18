@@ -1998,19 +1998,18 @@ class IntradayEngine:
             
             print("🔄 Data manager check passed...")  # Debug print
             
-            # Test live data connection with SPY
+            # Test live data connection with first symbol from watchlist
             try:
-                test_price = self.data_manager.get_current_price("SPY")
+                test_symbol = self.watchlist[0] if self.watchlist else "SPY"
+                test_price = self.data_manager.get_current_price(test_symbol)
                 if test_price is None or test_price <= 0:
-                    self.logger.error("❌ CRITICAL: Cannot get live market data - STOPPING TRADING")
-                    self.logger.error("❌ TRADING HALTED: Market data connection failed")
-                    self.is_running = False  # Stop the engine
-                    return
+                    self.logger.warning(f"⚠️ Cannot get live data for {test_symbol} - continuing anyway")
+                    # Don't stop the engine - just log the warning and continue
+                    # self.is_running = False  # Stop the engine
+                    # return
             except Exception as e:
-                self.logger.error(f"❌ CRITICAL: Market data connection error - {e}")
-                self.logger.error("❌ TRADING HALTED: Market data connection failed")
-                self.is_running = False  # Stop the engine
-                return
+                self.logger.warning(f"⚠️ Market data connection test failed for {test_symbol}: {e}")
+                # Continue trading even if test fails - individual symbols will be checked later
             
             # Sync positions with broker at start of each cycle
             self.sync_positions_with_broker()

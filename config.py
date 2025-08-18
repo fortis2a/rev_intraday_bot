@@ -67,12 +67,18 @@ RSI_OVERBOUGHT = 70
 VOLUME_MULTIPLIER = 1.5      # Volume must be 1.5x average
 
 # Signal Quality Filters
-MIN_CONFIDENCE_THRESHOLD = 0.75  # 75% minimum confidence for live trading
+MIN_CONFIDENCE_THRESHOLD = 0.70  # 70% minimum confidence for live trading (lowered from 75%)
 MIN_CONFIDENCE_DEMO = 0.50      # 50% minimum for demo/testing
 
 # Trading Control Settings
 TRADE_COOLDOWN_MINUTES = 5   # Minimum minutes between trades for same symbol
 MAX_TRADES_PER_HOUR = 6     # Maximum trades per hour per symbol
+
+# Short Selling Configuration
+ENABLE_SHORT_SELLING = True  # Enable short selling for SELL signals with no position
+SHORT_SELLING_MAX_POSITION_SIZE = 500  # Max position size for short positions
+SHORT_SELLING_MIN_CONFIDENCE = 75.0    # Minimum confidence required for short selling
+SHORT_SELLING_STOCKS = ['SOXL', 'SOFI', 'TQQQ', 'INTC', 'NIO']  # Stocks allowed for short selling
 
 # API Configuration - Load from .env file
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
@@ -96,7 +102,7 @@ SIGNAL_DELAY = 30    # seconds between signal checks (same as CHECK_INTERVAL)
 signal_delay = 30    # Alternative naming for engine compatibility
 max_hold_time = 7200 # Maximum hold time in seconds (2 hours)
 MAX_POSITIONS = 5    # maximum concurrent positions
-MIN_PRICE = 5.00     # minimum stock price to trade
+MIN_PRICE = 3.00     # minimum stock price to trade (lowered for NIO)
 MAX_PRICE = 500.00   # maximum stock price to trade
 
 # Additional Engine Settings
@@ -149,6 +155,10 @@ config = {
     'MIN_CONFIDENCE_DEMO': MIN_CONFIDENCE_DEMO,
     'TRADE_COOLDOWN_MINUTES': TRADE_COOLDOWN_MINUTES,
     'MAX_TRADES_PER_HOUR': MAX_TRADES_PER_HOUR,
+    'ENABLE_SHORT_SELLING': ENABLE_SHORT_SELLING,
+    'SHORT_SELLING_MAX_POSITION_SIZE': SHORT_SELLING_MAX_POSITION_SIZE,
+    'SHORT_SELLING_MIN_CONFIDENCE': SHORT_SELLING_MIN_CONFIDENCE,
+    'SHORT_SELLING_STOCKS': SHORT_SELLING_STOCKS,
     'ALPACA_BASE_URL': ALPACA_BASE_URL,
     'ALPACA_API_KEY': ALPACA_API_KEY,
     'ALPACA_SECRET_KEY': ALPACA_SECRET_KEY,

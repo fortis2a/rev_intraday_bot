@@ -123,22 +123,28 @@ class DataManager:
             return None
     
     def get_bars(self, symbol, timeframe='15Min', limit=100):
-        """Get historical bars for a symbol"""
+        """Get historical bars for a symbol with sufficient data for indicators"""
         try:
-            # Calculate start time with proper formatting
+            # Calculate start time with extended lookback to ensure sufficient data
             end_time = datetime.now()
             if timeframe == '1Min':
-                start_time = end_time - timedelta(hours=2)
+                start_time = end_time - timedelta(days=1)  # Extended for 1-min data
+                limit = min(limit, 500)  # Ensure we don't hit API limits
             elif timeframe == '5Min':
-                start_time = end_time - timedelta(hours=8)
+                start_time = end_time - timedelta(days=3)  # Extended for 5-min data
+                limit = min(limit, 300)
             elif timeframe == '15Min':
-                start_time = end_time - timedelta(days=2)
+                start_time = end_time - timedelta(days=7)  # Extended for 15-min data
+                limit = min(limit, 200)
             else:
-                start_time = end_time - timedelta(days=5)
+                start_time = end_time - timedelta(days=10)  # Extended for other timeframes
+                limit = min(limit, 150)
             
             # Format timestamps for Alpaca API (RFC3339 format)
             start_str = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
             end_str = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            self.logger.debug(f"[DATA] Requesting {symbol} {timeframe} bars from {start_str} to {end_str} (limit: {limit})")
             
             bars = self.api.get_bars(
                 symbol,
@@ -161,11 +167,64 @@ class DataManager:
             if not df.empty:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
                 df = df.set_index('timestamp')
+                self.logger.debug(f"[DATA] Retrieved {len(df)} bars for {symbol} {timeframe}")
+                
+                # If we still don't have enough data, try extended historical request
+                if len(df) < 30:  # Need minimum for MACD + buffer
+                    self.logger.warning(f"[DATA] Only {len(df)} bars for {symbol}, attempting extended historical request")
+                    return self._get_extended_historical_data(symbol, timeframe)
+            else:
+                self.logger.warning(f"[DATA] No bars returned for {symbol}")
             
             return df
             
         except Exception as e:
             self.logger.error(f"[ERROR] Failed to get bars for {symbol}: {e}")
+            return pd.DataFrame()
+    
+    def _get_extended_historical_data(self, symbol, timeframe):
+        """Get extended historical data when initial request is insufficient"""
+        try:
+            # Go back further in time for extended data
+            end_time = datetime.now()
+            if timeframe == '15Min':
+                start_time = end_time - timedelta(days=30)  # 30 days back
+                limit = 500
+            else:
+                start_time = end_time - timedelta(days=14)
+                limit = 400
+            
+            start_str = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            end_str = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            self.logger.info(f"[EXTENDED] Requesting extended {symbol} data from {start_str} (limit: {limit})")
+            
+            bars = self.api.get_bars(
+                symbol,
+                timeframe,
+                start=start_str,
+                end=end_str,
+                limit=limit
+            )
+            
+            df = pd.DataFrame([{
+                'timestamp': bar.t,
+                'open': float(bar.o),
+                'high': float(bar.h),
+                'low': float(bar.l),
+                'close': float(bar.c),
+                'volume': int(bar.v)
+            } for bar in bars])
+            
+            if not df.empty:
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                df = df.set_index('timestamp')
+                self.logger.info(f"[EXTENDED] Retrieved {len(df)} extended bars for {symbol}")
+            
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"[ERROR] Extended data request failed for {symbol}: {e}")
             return pd.DataFrame()
     
     def get_market_status(self):

@@ -595,6 +595,24 @@ while True:
             print("           STARTING LIVE TRADING WITH SIGNAL FEED")
             print("="*70)
             
+            # CRITICAL: Ask user if they want monitoring to prevent loops
+            print("\n[MONITORING OPTIONS]")
+            print("1. Start with monitoring (will prompt for restart if engine stops)")
+            print("2. Start without monitoring (fire-and-forget mode)")
+            print("3. Cancel and return to main menu")
+            
+            monitor_choice = input("\nChoose monitoring option (1-3): ").strip()
+            
+            if monitor_choice == '3':
+                print("[CANCEL] Returning to main menu...")
+                return
+            elif monitor_choice == '2':
+                print("[NO-MONITOR] Starting engine in fire-and-forget mode...")
+                enable_monitoring = False
+            else:
+                print("[MONITOR] Starting engine with monitoring...")
+                enable_monitoring = True
+            
             # Check market status first
             try:
                 result = subprocess.run([self.python_cmd, '-c', 
@@ -660,15 +678,64 @@ while True:
             if self.start_main_engine("LIVE"):
                 print("[INFO] Trading engine started - monitoring for signals...")
                 
-                # Monitor the process and show logs
+                if not enable_monitoring:
+                    print("[NO-MONITOR] Engine started in fire-and-forget mode.")
+                    print("[INFO] Engine is running independently. Check logs for status.")
+                    print("[INFO] Use 'Stop All Processes' from main menu if needed.")
+                    return
+                
+                # Monitor the process and show logs (only if monitoring enabled)
                 process = self.processes.get('main_engine')
                 if process:
                     try:
+                        print("[INFO] Engine is running. Press Ctrl+C to stop.")
                         # Let it run and show live output
                         while process.poll() is None:
                             time.sleep(2)
                             # Show recent logs
                             self.show_recent_activity()
+                        
+                        # Process has exited
+                        exit_code = process.returncode
+                        print(f"\n[EXIT] Trading engine has stopped (exit code: {exit_code})")
+                        
+                        if exit_code == 0:
+                            print("[INFO] Engine stopped cleanly")
+                        else:
+                            print("[WARNING] Engine stopped with error - check logs")
+                        
+                        # Ask user what to do next
+                        print("\n[OPTIONS]")
+                        print("1. Restart engine manually")
+                        print("2. Return to main menu")
+                        print("3. Exit launcher")
+                        
+                        choice = input("\nWhat would you like to do? (1-3): ").strip()
+                        
+                        if choice == '1':
+                            # Double confirmation to prevent accidental loops
+                            confirm = input("\nAre you sure you want to restart? (yes/no): ").strip().lower()
+                            if confirm in ['yes', 'y']:
+                                print("[RESTART] Manual restart confirmed...")
+                                # Restart by starting main engine again - NO RECURSIVE CALL
+                                if self.start_main_engine("LIVE"):
+                                    print("[RESTART] Engine restarted successfully")
+                                    # Don't monitor again - just return to menu
+                                    print("[INFO] Engine restarted. Returning to main menu to avoid loops.")
+                                    return
+                                else:
+                                    print("[ERROR] Failed to restart engine")
+                                    return
+                            else:
+                                print("[CANCEL] Restart cancelled - returning to main menu")
+                                return
+                        elif choice == '3':
+                            print("[EXIT] Exiting launcher...")
+                            self.stop_all_processes()
+                            exit(0)
+                        else:
+                            print("[MENU] Returning to main menu...")
+                            return
                             
                     except KeyboardInterrupt:
                         print("\n[STOP] Stopping live trading...")
