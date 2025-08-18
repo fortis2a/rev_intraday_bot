@@ -23,6 +23,14 @@
   - `scripts/confidence_monitor.py` (independent monitor as recommended)
   - `docs/CONFIDENCE_INTEGRATION_VERIFIED.md` (implementation docs)
 
+### ✅ **analyze_file_protection.py**
+- **Status:** Archived to `archive/`
+- **Reason:** Analysis completed, protection system implemented
+- **Replaced By:**
+  - `permanent_cleanup.py` (integrated protection rules)
+  - `permanent_cleanup.ps1` (active cleanup with protection)
+  - `docs/PREVENTION_STRATEGY.md` (cleanup documentation)
+
 ---
 
 ## 🔄 **Replacement Mapping**
@@ -37,6 +45,9 @@
 | Confidence integration analysis | `scripts/confidence_integrator.py` (implemented) |
 | Monitor independence evaluation | `scripts/confidence_monitor.py` (kept independent) |
 | Performance testing | `docs/CONFIDENCE_INTEGRATION_VERIFIED.md` |
+| File protection analysis | `permanent_cleanup.py` (protection integrated) |
+| Cleanup safety preview | `permanent_cleanup.ps1` (active with safety) |
+| Protection rule testing | `docs/PREVENTION_STRATEGY.md` (documented) |
 
 ---
 
@@ -68,18 +79,18 @@ python scripts/scalping_command_center.py
 Get-Content docs/AFTER_HOURS_POSITION_MANAGEMENT.md
 ```
 
-## 📞 **If You Need Confidence Analysis**
+## 📞 **If You Need Cleanup/Protection Analysis**
 
 **Use These Instead:**
 ```powershell
-# Current confidence levels (live system)
-python scripts/confidence_monitor.py
+# Preview what would be cleaned (same logic as archived file)
+python permanent_cleanup.py --preview
 
-# Integration status and setup
-Get-Content docs/CONFIDENCE_INTEGRATION_VERIFIED.md
+# Execute cleanup with full protection (integrated safety)
+.\permanent_cleanup.ps1
 
-# Real-time confidence integration (active system)
-# This runs automatically in the trading engine
+# Read comprehensive protection documentation
+Get-Content docs/PREVENTION_STRATEGY.md
 ```
 
 ---
