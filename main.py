@@ -118,6 +118,7 @@ class IntradayEngine:
                     
                     # Add position to trailing stop manager for ongoing management
                     try:
+                        # First add the position with proper initialization
                         self.order_manager.trailing_stop_manager.add_position(
                             symbol=symbol,
                             entry_price=entry_price,
@@ -127,9 +128,19 @@ class IntradayEngine:
                             custom_thresholds=thresholds
                         )
                         
+                        # Now update with current market price to set proper trailing state
+                        if current_price:
+                            self.order_manager.trailing_stop_manager.update_position_price(symbol, current_price)
+                            
+                            # Check if we should immediately activate trailing based on current profit
+                            current_profit_pct = (current_price - entry_price) / entry_price
+                            if current_profit_pct >= thresholds['trailing_activation_pct']:
+                                self.logger.info(f"[RECOVERY] {symbol} profit {current_profit_pct:.1%} >= {thresholds['trailing_activation_pct']:.1%}")
+                                self.logger.info(f"[RECOVERY] {symbol} Trailing stop should be ACTIVE on restart")
+                        
                         self.logger.info(f"[RECOVERY] {symbol} added to trailing stop management")
                         self.logger.info(f"[RECOVERY] {symbol} Stop: ${stop_loss_price:.2f}, "
-                                       f"Target: ${take_profit_price:.2f}")
+                                       f"Target: ${take_profit_price:.2f}, Current: ${current_price:.2f}")
                         
                         # Add to active positions tracking
                         self.active_positions[symbol] = {
@@ -142,8 +153,104 @@ class IntradayEngine:
                     except Exception as e:
                         self.logger.error(f"[RECOVERY] Failed to add {symbol} to trailing stop: {e}")
                 
+                elif side == 'short':
+                    # Handle short position recovery
+                    self.logger.info(f"[RECOVERY] Processing SHORT position: {symbol}")
+                    
+                    # Get stock-specific thresholds for this symbol
+                    try:
+                        from stock_specific_config import get_stock_thresholds
+                        thresholds = get_stock_thresholds(symbol)
+                    except:
+                        # Fallback to default thresholds
+                        thresholds = {
+                            'stop_loss_pct': config['STOP_LOSS_PCT'],
+                            'take_profit_pct': config['TAKE_PROFIT_PCT'],
+                            'trailing_activation_pct': config['TRAILING_STOP_ACTIVATION'],
+                            'trailing_distance_pct': config['TRAILING_STOP_PCT']
+                        }
+                    
+                    # For short positions: stop loss is ABOVE entry (buy to cover)
+                    # take profit is BELOW entry (profit from price drop)
+                    stop_loss_price = entry_price * (1 + thresholds['stop_loss_pct'])
+                    take_profit_price = entry_price * (1 - thresholds['take_profit_pct'])
+                    
+                    # Get current price to check for immediate actions
+                    current_price = self.data_manager.get_current_price(symbol)
+                    
+                    if current_price:
+                        # Check if short position should be closed immediately
+                        if current_price >= stop_loss_price:
+                            self.logger.warning(f"[RECOVERY] {symbol} ABOVE stop loss ${stop_loss_price:.2f}, "
+                                              f"current: ${current_price:.2f} - COVERING SHORT")
+                            self.order_manager.place_buy_order(symbol, {'strategy': 'stop_loss_recovery'})
+                            continue
+                        
+                        elif current_price <= take_profit_price:
+                            self.logger.info(f"[RECOVERY] {symbol} below take profit ${take_profit_price:.2f}, "
+                                           f"current: ${current_price:.2f} - COVERING SHORT FOR PROFIT")
+                            self.order_manager.place_buy_order(symbol, {'strategy': 'profit_target_recovery'})
+                            continue
+                    
+                    # Add short position to trailing stop manager for ongoing management
+                    try:
+                        self.order_manager.trailing_stop_manager.add_position(
+                            symbol=symbol,
+                            entry_price=entry_price,
+                            quantity=abs(qty),  # Use absolute value for quantity
+                            side='short',
+                            initial_stop_price=stop_loss_price,
+                            custom_thresholds=thresholds
+                        )
+                        
+                        # Place protective stop loss order (buy to cover)
+                        try:
+                            stop_order = self.order_manager.api.submit_order(
+                                symbol=symbol,
+                                qty=abs(qty),
+                                side='buy',  # Buy to cover short
+                                type='stop',
+                                stop_price=stop_loss_price,
+                                time_in_force='day'
+                            )
+                            self.logger.info(f"[RECOVERY] Stop loss order placed for {symbol} - Order ID: {stop_order.id}")
+                            
+                            # Store stop order ID for potential updates
+                            if hasattr(self.order_manager.trailing_stop_manager, 'stop_orders'):
+                                self.order_manager.trailing_stop_manager.stop_orders[symbol] = stop_order.id
+                                
+                        except Exception as e:
+                            self.logger.error(f"[RECOVERY] Failed to place stop loss for {symbol}: {e}")
+                        
+                        # Now update with current market price to set proper trailing state
+                        if current_price:
+                            self.order_manager.trailing_stop_manager.update_position_price(symbol, current_price)
+                            
+                            # Check if we should immediately activate trailing based on current profit
+                            # For shorts: profit when current_price < entry_price
+                            current_profit_pct = (entry_price - current_price) / entry_price
+                            if current_profit_pct >= thresholds['trailing_activation_pct']:
+                                self.logger.info(f"[RECOVERY] {symbol} SHORT profit {current_profit_pct:.1%} >= {thresholds['trailing_activation_pct']:.1%}")
+                                self.logger.info(f"[RECOVERY] {symbol} SHORT Trailing stop should be ACTIVE on restart")
+                        
+                        self.logger.info(f"[RECOVERY] {symbol} SHORT added to trailing stop management")
+                        self.logger.info(f"[RECOVERY] {symbol} Stop: ${stop_loss_price:.2f} (+{thresholds['stop_loss_pct']:.2%}), "
+                                       f"Target: ${take_profit_price:.2f} (-{thresholds['take_profit_pct']:.2%}), Current: ${current_price:.2f}")
+                        
+                        # Add to active positions tracking
+                        self.active_positions[symbol] = {
+                            'qty': qty,
+                            'entry_price': entry_price,
+                            'stop_loss': stop_loss_price,
+                            'take_profit': take_profit_price,
+                            'side': 'short'
+                        }
+                        
+                    except Exception as e:
+                        self.logger.error(f"[RECOVERY] Failed to add SHORT {symbol} to trailing stop: {e}")
+                
                 else:
-                    self.logger.warning(f"[RECOVERY] {symbol} is short position - manual review required")
+                    self.logger.warning(f"[RECOVERY] {symbol} has unknown position side: {side}")
             
             if self.active_positions:
                 self.logger.info(f"[RECOVERY] Successfully recovered {len(self.active_positions)} positions")

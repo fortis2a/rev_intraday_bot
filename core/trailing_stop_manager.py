@@ -176,6 +176,55 @@ class TrailingStopManager:
                                 'current_profit': position.profit_pct
                             }
             
+            elif position.side == 'short':
+                # For short positions: profit when price goes DOWN
+                position.profit_pct = (position.entry_price - current_price) / position.entry_price
+                position.unrealized_pnl = (position.entry_price - current_price) * position.quantity
+                
+                # Update lowest price seen (best for short positions)
+                if current_price < position.lowest_price:
+                    position.lowest_price = current_price
+                
+                # Check if trailing should activate using custom thresholds
+                # For shorts: activate when price drops enough to show profit
+                activation_threshold = position.entry_price * (1 - activation_pct)
+                if not position.is_trailing_active and current_price <= activation_threshold:
+                    position.is_trailing_active = True
+                    self.logger.info(f"[{symbol}] 🚀 SHORT Trailing stop ACTIVATED at ${current_price:.2f} (+{position.profit_pct:.1%})")
+                    self.logger.info(f"[{symbol}] 🎯 Using custom activation: {activation_pct:.1%}")
+                
+                # Adjust trailing stop if active using custom distance
+                if position.is_trailing_active:
+                    # For shorts: trailing stop is ABOVE the lowest price seen
+                    new_trailing_stop = round_to_cent(position.lowest_price * (1 + trailing_pct))
+                    
+                    # Validate price precision
+                    if not validate_price_precision(new_trailing_stop, f"{symbol} short_trailing_stop"):
+                        self.logger.warning(f"[{symbol}] SHORT trailing stop precision issue: {new_trailing_stop}")
+                        new_trailing_stop = round_to_cent(new_trailing_stop)
+                    
+                    # Only move stop down (never up for shorts, to protect more profit)
+                    if new_trailing_stop < position.trailing_stop_price:
+                        # Check minimum move threshold
+                        move_pct = (position.trailing_stop_price - new_trailing_stop) / position.trailing_stop_price
+                        if move_pct >= min_move_pct:
+                            old_stop = position.trailing_stop_price
+                            position.trailing_stop_price = new_trailing_stop
+                            
+                            self.logger.info(f"[{symbol}] 📉 SHORT trailing stop adjusted: ${old_stop:.2f} → ${new_trailing_stop:.2f}")
+                            self.logger.info(f"[{symbol}] 🎯 Custom distance: {trailing_pct:.1%}")
+                            self.logger.info(f"[{symbol}] 💎 Protected profit: {((position.entry_price - new_trailing_stop) / position.entry_price):.1%}")
+                            
+                            # Return update info for order modification
+                            return {
+                                'symbol': symbol,
+                                'action': 'update_stop',
+                                'new_stop_price': new_trailing_stop,
+                                'old_stop_price': old_stop,
+                                'profit_protected': ((position.entry_price - new_trailing_stop) / position.entry_price),
+                                'current_profit': position.profit_pct
+                            }
+            
             return None
             
         except Exception as e:
@@ -193,6 +242,11 @@ class TrailingStopManager:
             if position.side == 'long' and current_price <= position.trailing_stop_price:
                 self.logger.warning(f"[{symbol}] 🛑 TRAILING STOP TRIGGERED!")
                 self.logger.warning(f"[{symbol}] Price: ${current_price:.2f} ≤ Stop: ${position.trailing_stop_price:.2f}")
+                self.logger.warning(f"[{symbol}] Final P&L: {position.profit_pct:.1%} (${position.unrealized_pnl:.2f})")
+                return True
+            elif position.side == 'short' and current_price >= position.trailing_stop_price:
+                self.logger.warning(f"[{symbol}] 🛑 SHORT TRAILING STOP TRIGGERED!")
+                self.logger.warning(f"[{symbol}] Price: ${current_price:.2f} ≥ Stop: ${position.trailing_stop_price:.2f}")
                 self.logger.warning(f"[{symbol}] Final P&L: {position.profit_pct:.1%} (${position.unrealized_pnl:.2f})")
                 return True
             
