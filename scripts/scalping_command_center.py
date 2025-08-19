@@ -288,11 +288,15 @@ class ScalpingCommandCenter:
         # Top row - Account & P&L Summary
         self.create_account_panel(content_frame)
         
-        # Middle row - Three main panels
+        # Profit Protection Panel
+        self.create_profit_protection_panel(content_frame)
+        
+        # Middle row - Four main panels (including Quick Actions)
         middle_frame = tk.Frame(content_frame, bg=self.colors['bg_primary'])
         middle_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
         self.create_confidence_panel(middle_frame)
+        self.create_quick_actions_panel(middle_frame)
         self.create_trade_execution_panel(middle_frame)
         self.create_strategy_performance_panel(middle_frame)
         
@@ -353,6 +357,119 @@ class ScalpingCommandCenter:
         # Configure grid weights
         for i in range(4):
             metrics_frame.grid_columnconfigure(i, weight=1)
+            
+    def create_profit_protection_panel(self, parent):
+        """Create profit protection and position management panel"""
+        panel = ttk.LabelFrame(parent, text="🛡️ PROFIT PROTECTION & POSITION MANAGEMENT", 
+                              style='Dark.TFrame')
+        panel.pack(fill=tk.X, pady=(0, 10))
+        
+        # Main container with two sections
+        main_container = tk.Frame(panel, bg=self.colors['bg_secondary'])
+        main_container.pack(fill=tk.X, padx=10, pady=10)
+        
+        # Left section - Current Positions
+        positions_frame = tk.Frame(main_container, bg=self.colors['bg_secondary'])
+        positions_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        tk.Label(positions_frame, text="📊 CURRENT POSITIONS", 
+                font=('Arial', 11, 'bold'), bg=self.colors['bg_secondary'],
+                fg=self.colors['fg_accent']).pack(anchor=tk.W)
+        
+        # Positions list with headers
+        headers_frame = tk.Frame(positions_frame, bg=self.colors['bg_tertiary'])
+        headers_frame.pack(fill=tk.X, pady=(5, 2))
+        
+        headers = ["Symbol", "Side", "Qty", "Entry", "Current", "P&L %", "P&L $", "Protection"]
+        header_widths = [8, 6, 6, 8, 8, 8, 10, 12]
+        
+        for i, (header, width) in enumerate(zip(headers, header_widths)):
+            tk.Label(headers_frame, text=header, font=('Arial', 8, 'bold'),
+                    bg=self.colors['bg_tertiary'], fg=self.colors['fg_secondary'],
+                    width=width, anchor='center').grid(row=0, column=i, padx=0, sticky='ew')
+        
+        # Configure grid weights for proper alignment
+        for i in range(len(headers)):
+            headers_frame.grid_columnconfigure(i, weight=0, minsize=header_widths[i]*8)
+        
+        # Scrollable positions list
+        positions_canvas = tk.Canvas(positions_frame, bg=self.colors['bg_secondary'], 
+                                   height=120, highlightthickness=0)
+        positions_scrollbar = ttk.Scrollbar(positions_frame, orient="vertical", 
+                                          command=positions_canvas.yview)
+        self.positions_list_frame = tk.Frame(positions_canvas, bg=self.colors['bg_secondary'])
+        
+        self.positions_list_frame.bind(
+            "<Configure>",
+            lambda e: positions_canvas.configure(scrollregion=positions_canvas.bbox("all"))
+        )
+        
+        positions_canvas.create_window((0, 0), window=self.positions_list_frame, anchor="nw")
+        positions_canvas.configure(yscrollcommand=positions_scrollbar.set)
+        
+        positions_canvas.pack(side="left", fill="both", expand=True)
+        positions_scrollbar.pack(side="right", fill="y")
+        
+        # Initialize profit protection variables
+        self.positions_data = {}
+        self.protection_orders = {}
+        self.last_protection_check = datetime.now()
+            
+    def create_quick_actions_panel(self, parent):
+        """Create standalone Quick Actions panel"""
+        panel = ttk.LabelFrame(parent, text="⚡ QUICK ACTIONS", 
+                              style='Dark.TFrame')
+        panel.pack(side=tk.LEFT, fill=tk.Y, padx=(5, 5))
+        
+        # Main container
+        main_container = tk.Frame(panel, bg=self.colors['bg_secondary'])
+        main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Protection status
+        self.protection_status_var = tk.StringVar(value="🔍 Checking...")
+        tk.Label(main_container, textvariable=self.protection_status_var,
+                font=('Arial', 9, 'bold'), bg=self.colors['bg_secondary'],
+                fg=self.colors['fg_info']).pack(pady=(0, 15))
+        
+        # Action buttons with proper spacing
+        button_style = {'font': ('Arial', 9, 'bold'), 'width': 24, 'pady': 8}
+        
+        tk.Button(main_container, text="🛡️ Protect All Positions", 
+                 bg=self.colors['fg_accent'], fg='black',
+                 command=self.protect_all_positions, **button_style).pack(pady=5)
+        
+        tk.Button(main_container, text="💰 Take Profit (50%)", 
+                 bg=self.colors['fg_warning'], fg='black',
+                 command=self.take_partial_profits, **button_style).pack(pady=5)
+        
+        tk.Button(main_container, text="🚪 Close All Positions", 
+                 bg=self.colors['fg_danger'], fg='white',
+                 command=self.close_all_positions, **button_style).pack(pady=5)
+        
+        tk.Button(main_container, text="🔄 Refresh Protection", 
+                 bg=self.colors['fg_info'], fg='black',
+                 command=self.refresh_protection_status, **button_style).pack(pady=5)
+        
+        # Summary stats
+        summary_frame = tk.Frame(main_container, bg=self.colors['bg_tertiary'], relief=tk.RAISED, bd=1)
+        summary_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        tk.Label(summary_frame, text="PROTECTION SUMMARY", 
+                font=('Arial', 9, 'bold'), bg=self.colors['bg_tertiary'],
+                fg=self.colors['fg_secondary']).pack(pady=(8, 5))
+        
+        self.total_positions_var = tk.StringVar(value="Positions: 0")
+        self.protected_positions_var = tk.StringVar(value="Protected: 0")
+        self.total_pnl_var = tk.StringVar(value="Total P&L: $0.00")
+        self.at_risk_var = tk.StringVar(value="At Risk: $0.00")
+        
+        for var in [self.total_positions_var, self.protected_positions_var, 
+                   self.total_pnl_var, self.at_risk_var]:
+            tk.Label(summary_frame, textvariable=var, font=('Consolas', 9),
+                    bg=self.colors['bg_tertiary'], fg=self.colors['fg_primary']).pack(pady=3, padx=8)
+        
+        # Bottom padding
+        tk.Label(summary_frame, text="", bg=self.colors['bg_tertiary']).pack(pady=5)
             
     def create_confidence_panel(self, parent):
         """Create confidence monitoring panel"""
@@ -425,17 +542,17 @@ class ScalpingCommandCenter:
         log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Create treeview for trade log
-        columns = ("Date", "Time", "Symbol", "Action", "Qty", "Price", "P&L", "Strategy")
+        columns = ("Date", "Time", "Symbol", "Action", "Qty", "Open", "Price", "% Change", "P&L", "Strategy")
         self.trade_tree = ttk.Treeview(log_frame, columns=columns, show="headings",
                                       height=15)
         
         # Configure columns
-        column_widths = {"Date": 80, "Time": 80, "Symbol": 60, "Action": 50, "Qty": 50, 
-                        "Price": 70, "P&L": 70, "Strategy": 100}
+        column_widths = {"Date": 70, "Time": 70, "Symbol": 55, "Action": 45, "Qty": 40, 
+                        "Open": 60, "Price": 60, "% Change": 65, "P&L": 60, "Strategy": 90}
         
         for col in columns:
             self.trade_tree.heading(col, text=col)
-            self.trade_tree.column(col, width=column_widths.get(col, 80), minwidth=50)
+            self.trade_tree.column(col, width=column_widths.get(col, 60), minwidth=45)
         
         # Scrollbars for trade log
         trade_v_scroll = ttk.Scrollbar(log_frame, orient="vertical", 
@@ -942,6 +1059,7 @@ class ScalpingCommandCenter:
                             qty = float(pos.qty)
                             side = "BUY" if qty > 0 else "SELL"
                             current_price = float(pos.current_price) if pos.current_price else 0.0
+                            entry_price = float(pos.avg_entry_price) if pos.avg_entry_price else current_price  # Entry/open price
                             pnl = float(pos.unrealized_pl) if pos.unrealized_pl else 0.0
                             
                             # Use current time for display
@@ -971,6 +1089,7 @@ class ScalpingCommandCenter:
                                 'symbol': pos.symbol,
                                 'action': f"{side} {abs(qty):.0f}",
                                 'quantity': int(abs(qty)),
+                                'open_price': entry_price,
                                 'price': current_price,
                                 'pnl': pnl,
                                 'strategy': strategy
@@ -983,13 +1102,11 @@ class ScalpingCommandCenter:
                         
                     else:
                         self.logger.info("📊 No current positions found in Alpaca account")
-                        # Add some demo trades to show interface functionality
-                        self._add_demo_trades()
+                        # Only use real trade data - no demo trades
                         
                 except Exception as e:
                     self.logger.warning(f"Could not fetch real Alpaca positions: {e}")
-                    # Add demo trades if real data fails
-                    self._add_demo_trades()
+                    # Only proceed with real data - no demo fallback
                     
             # Fallback to trade parser
             if self.has_real_data and self.trade_parser:
@@ -1041,74 +1158,11 @@ class ScalpingCommandCenter:
                         
                 except Exception as e:
                     self.logger.debug(f"Could not get real trade data from parser: {e}")
-                    
-            # Final fallback - simulate for development only if no real data
-            if not self.trade_alerts:
-                self._simulate_trade_data()
                 
         except Exception as e:
             self.logger.error(f"Error fetching trade data: {e}")
     
-    def _add_demo_trades(self):
-        """Add demo trades to show interface functionality when no real trades exist"""
-        from datetime import timedelta
-        import random
-        
-        symbols = ['SOXL', 'SOFI', 'TQQQ', 'INTC', 'NIO']
-        actions = ['BUY', 'SELL']
-        strategies = ['Scalping', 'Mean Reversion', 'Momentum', 'VWAP Bounce']
-        
-        # Generate 5 demo trades with realistic timestamps (past few hours)
-        base_time = datetime.now()
-        for i in range(5):
-            # Create trades going back in time
-            trade_time = base_time - timedelta(minutes=random.randint(10, 180))
-            
-            # Calculate P&L based on action
-            action = random.choice(actions)
-            if action == 'BUY':
-                pnl = random.uniform(-2.50, 8.75)  # Realistic P&L for buys
-            else:
-                pnl = random.uniform(-3.20, 12.30)  # Realistic P&L for sells
-            
-            trade = {
-                'date': trade_time.strftime("%m/%d/%Y"),
-                'time': trade_time.strftime("%H:%M:%S"),
-                'symbol': random.choice(symbols),
-                'action': action,
-                'quantity': random.randint(10, 50),
-                'price': random.uniform(20.50, 45.75),
-                'pnl': pnl,
-                'strategy': random.choice(strategies)
-            }
-            
-            self.trade_alerts.append(trade)
-        
-        # Sort by time (most recent first)
-        self.trade_alerts.sort(key=lambda x: x['time'], reverse=True)
-        self.logger.info(f"📊 Added {len(self.trade_alerts)} demo trades for interface testing")
     
-    def _simulate_trade_data(self):
-        """Simulate trade data for development/testing"""
-        import random
-        
-        # Occasionally add a new trade
-        if random.random() < 0.08:  # 8% chance of new trade per update
-            trade = {
-                'time': datetime.now().strftime("%H:%M:%S"),
-                'symbol': random.choice(SYMBOLS),
-                'action': random.choice(['BUY', 'SELL']),
-                'quantity': random.randint(10, 100),
-                'price': random.uniform(100, 400),
-                'pnl': random.uniform(-75, 150),  # More realistic P&L range
-                'strategy': random.choice(['Mean Reversion', 'Momentum Scalp', 'VWAP Bounce'])
-            }
-            self.trade_alerts.append(trade)
-            
-            # Keep only last 100 trades
-            if len(self.trade_alerts) > 100:
-                self.trade_alerts = self.trade_alerts[-100:]
-            
     def fetch_strategy_performance(self):
         """Fetch strategy performance metrics by stock"""
         try:
@@ -1394,6 +1448,7 @@ class ScalpingCommandCenter:
         """Update all GUI elements with latest data"""
         try:
             self.update_account_display()
+            self.update_profit_protection_display()
             self.update_confidence_display()
             self.update_trade_display()
             self.update_strategy_display()
@@ -1444,13 +1499,30 @@ class ScalpingCommandCenter:
             
         # Add recent trades
         for trade in self.trade_alerts[-20:]:  # Show last 20 trades
+            # Calculate open price and % change
+            open_price = trade.get('open_price', trade['price'])  # Default to current price if no open price
+            current_price = trade['price']
+            
+            # Calculate percentage change based on position direction
+            if open_price > 0:
+                if trade['action'] == 'BUY':
+                    # For BUY positions: price up = gain, price down = loss
+                    pct_change = ((current_price - open_price) / open_price) * 100
+                else:
+                    # For SELL positions: price up = loss, price down = gain
+                    pct_change = ((open_price - current_price) / open_price) * 100
+            else:
+                pct_change = 0.0
+            
             values = (
                 trade.get('date', datetime.now().strftime("%m/%d/%Y")),
                 trade.get('time', datetime.now().strftime("%H:%M:%S")),
                 trade['symbol'],
                 trade['action'],
                 trade['quantity'],
-                f"${trade['price']:.2f}",
+                f"${open_price:.2f}",
+                f"${current_price:.2f}",
+                f"{pct_change:+.2f}%",
                 f"${trade['pnl']:+.2f}",
                 trade['strategy']
             )
@@ -1566,6 +1638,352 @@ class ScalpingCommandCenter:
             self.status_var.set("🚀 Command Center active - Monitoring all systems")
         else:
             self.status_var.set("⚠️ Command Center shutting down...")
+            
+    # =================== PROFIT PROTECTION METHODS ===================
+    
+    def update_profit_protection_display(self):
+        """Update profit protection panel with current positions and protection status"""
+        try:
+            # Clear existing position displays
+            for widget in self.positions_list_frame.winfo_children():
+                widget.destroy()
+            
+            # Get current positions from Alpaca
+            if HAS_REAL_INTEGRATION and hasattr(self, 'data_manager'):
+                positions = self.get_current_positions()
+                orders = self.get_current_orders()
+                
+                # Update positions display
+                total_positions = len(positions)
+                protected_count = 0
+                total_pnl = 0.0
+                at_risk_pnl = 0.0
+                
+                for i, pos in enumerate(positions):
+                    # Handle both dict and object formats
+                    def get_attr(obj, attr):
+                        if isinstance(obj, dict):
+                            return obj.get(attr, 0)
+                        else:
+                            return getattr(obj, attr, 0)
+                    
+                    # Calculate position metrics
+                    qty = float(get_attr(pos, 'qty'))
+                    side = 'LONG' if qty > 0 else 'SHORT'
+                    entry_price = float(get_attr(pos, 'avg_entry_price'))
+                    market_value = float(get_attr(pos, 'market_value'))
+                    current_price = market_value / qty if qty != 0 else entry_price
+                    unrealized_pnl = float(get_attr(pos, 'unrealized_pl'))
+                    symbol = get_attr(pos, 'symbol')
+                    
+                    if side == 'LONG':
+                        pnl_pct = (current_price - entry_price) / entry_price * 100
+                    else:
+                        pnl_pct = (entry_price - current_price) / entry_price * 100
+                    
+                    total_pnl += unrealized_pnl
+                    
+                    # Check if position is protected
+                    symbol_orders = [o for o in orders if get_attr(o, 'symbol') == symbol]
+                    is_protected = len(symbol_orders) > 0
+                    if is_protected:
+                        protected_count += 1
+                    else:
+                        at_risk_pnl += unrealized_pnl
+                    
+                    # Create position row
+                    pos_frame = tk.Frame(self.positions_list_frame, bg=self.colors['bg_tertiary'])
+                    pos_frame.pack(fill=tk.X, pady=1)
+                    
+                    # Position data
+                    pos_data = [
+                        symbol,
+                        side,
+                        str(abs(int(qty))),
+                        f"${entry_price:.2f}",
+                        f"${current_price:.2f}",
+                        f"{pnl_pct:+.2f}%",
+                        f"${unrealized_pnl:+.2f}",
+                        "🛡️ YES" if is_protected else "⚠️ NO"
+                    ]
+                    
+                    widths = [8, 6, 6, 8, 8, 8, 10, 12]
+                    colors = [
+                        self.colors['fg_primary'], self.colors['fg_primary'], self.colors['fg_primary'],
+                        self.colors['fg_primary'], self.colors['fg_primary'],
+                        self.colors['fg_accent'] if pnl_pct > 0 else self.colors['fg_danger'],
+                        self.colors['fg_accent'] if unrealized_pnl > 0 else self.colors['fg_danger'],
+                        self.colors['fg_accent'] if is_protected else self.colors['fg_warning']
+                    ]
+                    
+                    for j, (data, width, color) in enumerate(zip(pos_data, widths, colors)):
+                        tk.Label(pos_frame, text=data, font=('Consolas', 8),
+                                bg=self.colors['bg_tertiary'], fg=color,
+                                width=width, anchor='center').grid(row=0, column=j, padx=0, sticky='ew')
+                    
+                    # Configure grid weights for this row to match headers
+                    for j in range(len(widths)):
+                        pos_frame.grid_columnconfigure(j, weight=0, minsize=widths[j]*8)
+                
+                # Update summary
+                self.total_positions_var.set(f"Positions: {total_positions}")
+                self.protected_positions_var.set(f"Protected: {protected_count}/{total_positions}")
+                self.total_pnl_var.set(f"Total P&L: ${total_pnl:+.2f}")
+                self.at_risk_var.set(f"At Risk: ${at_risk_pnl:+.2f}")
+                
+                # Update protection status
+                if total_positions == 0:
+                    self.protection_status_var.set("📊 No positions")
+                elif protected_count == total_positions:
+                    self.protection_status_var.set("✅ All positions protected")
+                elif protected_count == 0:
+                    self.protection_status_var.set("⚠️ NO positions protected!")
+                else:
+                    self.protection_status_var.set(f"🔶 {protected_count}/{total_positions} protected")
+            
+            else:
+                self.protection_status_var.set("❌ Protection unavailable")
+                
+        except Exception as e:
+            self.logger.error(f"Error updating profit protection display: {e}")
+            self.protection_status_var.set("❌ Display error")
+    
+    def get_current_positions(self):
+        """Get current positions from Alpaca API"""
+        try:
+            if hasattr(self, 'data_manager') and self.data_manager:
+                return self.data_manager.get_positions()
+            else:
+                # Fallback direct API call
+                import alpaca_trade_api as tradeapi
+                api = tradeapi.REST(
+                    config['ALPACA_API_KEY'],
+                    config['ALPACA_SECRET_KEY'], 
+                    config['ALPACA_BASE_URL']
+                )
+                return api.list_positions()
+        except Exception as e:
+            self.logger.error(f"Error getting positions: {e}")
+            return []
+    
+    def get_current_orders(self):
+        """Get current open orders from Alpaca API"""
+        try:
+            if hasattr(self, 'data_manager') and self.data_manager:
+                # Use data manager if available
+                import alpaca_trade_api as tradeapi
+                api = tradeapi.REST(
+                    config['ALPACA_API_KEY'],
+                    config['ALPACA_SECRET_KEY'], 
+                    config['ALPACA_BASE_URL']
+                )
+                return api.list_orders(status='open')
+            else:
+                # Fallback direct API call
+                import alpaca_trade_api as tradeapi
+                api = tradeapi.REST(
+                    config['ALPACA_API_KEY'],
+                    config['ALPACA_SECRET_KEY'], 
+                    config['ALPACA_BASE_URL']
+                )
+                return api.list_orders(status='open')
+        except Exception as e:
+            self.logger.error(f"Error getting orders: {e}")
+            return []
+    
+    def protect_all_positions(self):
+        """Apply emergency protection to all positions"""
+        try:
+            positions = self.get_current_positions()
+            protected_count = 0
+            skipped_count = 0
+            
+            for pos in positions:
+                # Handle both dict and object formats
+                def get_attr(obj, attr):
+                    if isinstance(obj, dict):
+                        return obj.get(attr, 0)
+                    else:
+                        return getattr(obj, attr, 0)
+                
+                symbol = get_attr(pos, 'symbol')
+                unrealized_pl = float(get_attr(pos, 'unrealized_pl'))
+                
+                # Check if position already has protection orders
+                orders = self.get_current_orders()
+                symbol_orders = [o for o in orders if get_attr(o, 'symbol') == symbol]
+                
+                if len(symbol_orders) > 0:
+                    # Position already has protection orders
+                    skipped_count += 1
+                    continue
+                
+                # Apply protection to ALL positions (profitable and losing)
+                if self.apply_position_protection(pos):
+                    protected_count += 1
+            
+            if protected_count > 0:
+                self.protection_status_var.set(f"✅ Protected {protected_count} positions")
+                messagebox.showinfo("Protection Applied", 
+                                   f"Applied protection to {protected_count} positions")
+            elif skipped_count > 0:
+                self.protection_status_var.set(f"ℹ️ All {skipped_count} positions already protected")
+                messagebox.showinfo("Protection Status", 
+                                   f"All {skipped_count} positions already have protection orders")
+            else:
+                self.protection_status_var.set("ℹ️ No positions to protect")
+                messagebox.showinfo("Protection Status", "No positions found to protect")
+            
+        except Exception as e:
+            self.logger.error(f"Error protecting positions: {e}")
+            messagebox.showerror("Protection Error", f"Failed to protect positions: {e}")
+    
+    def apply_position_protection(self, position):
+        """Apply protection orders to a single position"""
+        try:
+            import alpaca_trade_api as tradeapi
+            api = tradeapi.REST(
+                config['ALPACA_API_KEY'],
+                config['ALPACA_SECRET_KEY'], 
+                config['ALPACA_BASE_URL']
+            )
+            
+            # Handle both dict and object formats
+            def get_attr(obj, attr):
+                if isinstance(obj, dict):
+                    return obj.get(attr, 0)
+                else:
+                    return getattr(obj, attr, 0)
+            
+            symbol = get_attr(position, 'symbol')
+            qty_val = float(get_attr(position, 'qty'))
+            side = 'long' if qty_val > 0 else 'short'
+            qty = abs(qty_val)
+            entry_price = float(get_attr(position, 'avg_entry_price'))
+            market_value = float(get_attr(position, 'market_value'))
+            current_price = market_value / qty_val if qty_val != 0 else entry_price
+            
+            # Cancel existing orders for this symbol
+            existing_orders = api.list_orders(status='open', symbols=symbol)
+            for order in existing_orders:
+                api.cancel_order(order.id)
+            
+            if side == 'long':
+                # For long positions
+                stop_price = current_price * 0.98  # 2% trailing stop
+                profit_price = current_price * 1.01  # 1% take profit
+                
+                # Stop loss
+                api.submit_order(
+                    symbol=symbol, qty=qty, side='sell', type='stop',
+                    stop_price=round(stop_price, 2), time_in_force='gtc'
+                )
+                
+                # Take profit  
+                api.submit_order(
+                    symbol=symbol, qty=qty, side='sell', type='limit',
+                    limit_price=round(profit_price, 2), time_in_force='gtc'
+                )
+            else:
+                # For short positions
+                stop_price = current_price * 1.02  # 2% stop above current
+                profit_price = current_price * 0.99  # 1% profit below current
+                
+                # Stop loss (buy to cover)
+                api.submit_order(
+                    symbol=symbol, qty=qty, side='buy', type='stop',
+                    stop_price=round(stop_price, 2), time_in_force='gtc'
+                )
+                
+                # Take profit (buy to cover)
+                api.submit_order(
+                    symbol=symbol, qty=qty, side='buy', type='limit',
+                    limit_price=round(profit_price, 2), time_in_force='gtc'
+                )
+            
+            self.logger.info(f"Applied protection to {symbol} ({side})")
+            return True
+            
+        except Exception as e:
+            # Handle both dict and object formats for error logging
+            def get_attr(obj, attr):
+                if isinstance(obj, dict):
+                    return obj.get(attr, 'unknown')
+                else:
+                    return getattr(obj, attr, 'unknown')
+            
+            symbol = get_attr(position, 'symbol')
+            self.logger.error(f"Failed to protect {symbol}: {e}")
+            return False
+    
+    def take_partial_profits(self):
+        """Take 50% profits on all profitable positions"""
+        try:
+            import alpaca_trade_api as tradeapi
+            api = tradeapi.REST(
+                config['ALPACA_API_KEY'],
+                config['ALPACA_SECRET_KEY'], 
+                config['ALPACA_BASE_URL']
+            )
+            
+            positions = self.get_current_positions()
+            closed_count = 0
+            
+            for pos in positions:
+                if float(pos.unrealized_pl) > 0:  # Only profitable positions
+                    symbol = pos.symbol
+                    qty = abs(float(pos.qty))
+                    partial_qty = max(1, int(qty * 0.5))  # 50% or minimum 1 share
+                    
+                    side = 'sell' if float(pos.qty) > 0 else 'buy'
+                    
+                    api.submit_order(
+                        symbol=symbol, qty=partial_qty, side=side, 
+                        type='market', time_in_force='gtc'
+                    )
+                    
+                    closed_count += 1
+                    self.logger.info(f"Partial profit taken on {symbol}: {partial_qty} shares")
+            
+            self.protection_status_var.set(f"💰 Partial profits taken")
+            messagebox.showinfo("Partial Profits", 
+                               f"Took 50% profits on {closed_count} positions")
+            
+        except Exception as e:
+            self.logger.error(f"Error taking partial profits: {e}")
+            messagebox.showerror("Profit Error", f"Failed to take profits: {e}")
+    
+    def close_all_positions(self):
+        """Close all positions immediately"""
+        try:
+            confirm = messagebox.askyesno("Confirm Close All", 
+                                        "Are you sure you want to close ALL positions?")
+            if not confirm:
+                return
+            
+            import alpaca_trade_api as tradeapi
+            api = tradeapi.REST(
+                config['ALPACA_API_KEY'],
+                config['ALPACA_SECRET_KEY'], 
+                config['ALPACA_BASE_URL']
+            )
+            
+            # Close all positions
+            api.close_all_positions(cancel_orders=True)
+            
+            self.protection_status_var.set("🚪 All positions closed")
+            messagebox.showinfo("Positions Closed", "All positions have been closed")
+            
+        except Exception as e:
+            self.logger.error(f"Error closing all positions: {e}")
+            messagebox.showerror("Close Error", f"Failed to close positions: {e}")
+    
+    def refresh_protection_status(self):
+        """Manually refresh the protection status"""
+        self.update_profit_protection_display()
+        self.protection_status_var.set("🔄 Refreshed")
+    
+    # =================== END PROFIT PROTECTION METHODS ===================
             
     def on_closing(self):
         """Handle application close"""
