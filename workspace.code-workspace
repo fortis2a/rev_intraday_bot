@@ -1,0 +1,47 @@
+{
+    "folders": [
+        {
+            "name": "🎯 Trading System (Root)",
+            "path": "."
+        },
+        {
+            "name": "📊 Core Components",
+            "path": "./core"
+        },
+        {
+            "name": "🛠️ Scripts & Utilities", 
+            "path": "./scripts"
+        },
+        {
+            "name": "📈 Data & Analysis",
+            "path": "./data"
+        },
+        {
+            "name": "📋 Documentation",
+            "path": "./docs"
+        }
+    ],
+    "settings": {
+        "files.exclude": {
+            "**/archive/**": true,
+            "**/backup_untracked_*/**": true,
+            "**/tests/**": true,
+            "**/documentation/**": true,
+            "**/__pycache__/**": true,
+            "**/*.pyc": true
+        },
+        "search.exclude": {
+            "**/archive/**": true,
+            "**/backup_untracked_*/**": true,
+            "**/tests/**": true,
+            "**/documentation/**": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-python.python",
+            "ms-python.vscode-pylance",
+            "ms-toolsai.jupyter"
+        ]
+    }
+}

@@ -23,8 +23,7 @@ data/positions_*.json
 *.pdf
 reports/
 
-# IDE
-.vscode/
+# IDE (but keep current .vscode/settings.json)
 .idea/
 *.swp
 *.swo
@@ -32,3 +31,9 @@ reports/
 # OS
 .DS_Store
 Thumbs.db
+
+# Workspace organization (exclude from future commits)
+# Note: Current archive/ and backup folders are already committed
+temp_*
+scratch_*
+*.tmp
