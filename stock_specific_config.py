@@ -246,7 +246,7 @@ def calculate_final_confidence(symbol: str, base_confidence: float = 85.0) -> fl
     
     return round(final_confidence, 1)
 
-def meets_confidence_threshold(symbol: str, min_threshold: float = 75.0) -> bool:
+def meets_confidence_threshold(symbol: str, min_threshold: float = 70.0) -> bool:
     """
     Check if stock meets minimum confidence threshold for trading
     Returns True if stock should be traded, False to skip
@@ -268,7 +268,7 @@ def get_filtered_watchlist(watchlist: list, min_confidence: float = 75.0, use_re
     """
     filtered_list = []
     
-    print(f"\n🎯 FILTERING WATCHLIST (Min Confidence: {min_confidence}%)")
+    print(f"\n[TARGET] FILTERING WATCHLIST (Min Confidence: {min_confidence}%)")
     print(f"📊 Mode: {'Real-time calculation (STRICT - no fallback)' if use_real_time else 'Historical baseline'}")
     print("=" * 60)
     
@@ -310,7 +310,7 @@ def get_filtered_watchlist(watchlist: list, min_confidence: float = 75.0, use_re
                 filtered_list.append(symbol)
     
     print(f"\n📊 RESULTS: {len(filtered_list)}/{len(watchlist)} stocks passed confidence filter")
-    print(f"✅ Trading: {', '.join(filtered_list) if filtered_list else 'NONE - Real-time required'}")
+    print(f"[OK] Trading: {', '.join(filtered_list) if filtered_list else 'NONE - Real-time required'}")
     
     if len(filtered_list) != len(watchlist):
         skipped = [s for s in watchlist if s not in filtered_list]
@@ -366,14 +366,14 @@ def should_execute_trade(symbol: str, signal_type: str = 'entry') -> dict:
     """
     # Determine trade direction for display
     direction = "LONG" if signal_type == "BUY" else "SHORT" if signal_type == "SELL" else signal_type.upper()
-    print(f"\n🎯 FINAL TRADE DECISION CHECK: {symbol} ({direction})")
+    print(f"\n[TARGET] FINAL TRADE DECISION CHECK: {symbol} ({direction})")
     
     # Get real-time confidence
     confidence_data = get_real_time_confidence_for_trade(symbol)
     
     # Check for errors in real-time calculation
     if confidence_data.get('mode') == 'error':
-        print(f"❌ TRADING BLOCKED: {symbol} - Real-time calculation failed")
+        print(f"[X] TRADING BLOCKED: {symbol} - Real-time calculation failed")
         print(f"   Error: {confidence_data.get('error', 'Unknown error')}")
         return {
             'symbol': symbol,
@@ -407,12 +407,12 @@ def should_execute_trade(symbol: str, signal_type: str = 'entry') -> dict:
     }
     
     if execute_trade:
-        print(f"✅ EXECUTE TRADE: {symbol} - Real-time confidence: {confidence_data['confidence']:.1f}%")
+        print(f"[OK] EXECUTE TRADE: {symbol} - Real-time confidence: {confidence_data['confidence']:.1f}%")
     else:
         if confidence_data['confidence'] > 0:
-            print(f"❌ SKIP TRADE: {symbol} - Real-time confidence: {confidence_data['confidence']:.1f}% below {min_confidence:.0f}% threshold")
+            print(f"[SKIP] SKIP TRADE: {symbol} - Real-time confidence: {confidence_data['confidence']:.1f}% below {min_confidence:.0f}% threshold")
         else:
-            print(f"❌ SKIP TRADE: {symbol} - Real-time calculation failed or returned 0% confidence")
+            print(f"[SKIP] SKIP TRADE: {symbol} - Real-time calculation failed or returned 0% confidence")
     
     return decision
     
@@ -433,7 +433,7 @@ def print_stock_analysis_summary():
               f"{config['trailing_distance_pct']*100:<6.1f} "
               f"{config['volatility']:<10.2f} {config['profile']:<15}")
     
-    print("\n🎯 Key Insights:")
+    print("\n[TARGET] Key Insights:")
     print(f"• Low Volatility (JNJ, PG): Tight spreads, larger position sizes allowed")
     print(f"• Moderate Volatility (IONQ, RGTI): Balanced approach")
     print(f"• High Volatility (QBTS): Wider spreads, smaller position sizes")

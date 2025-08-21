@@ -1505,7 +1505,7 @@ class ScalpingCommandCenter:
             
             # Calculate percentage change based on position direction
             if open_price > 0:
-                if trade['action'] == 'BUY':
+                if 'BUY' in trade['action']:
                     # For BUY positions: price up = gain, price down = loss
                     pct_change = ((current_price - open_price) / open_price) * 100
                 else:

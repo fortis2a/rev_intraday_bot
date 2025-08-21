@@ -367,7 +367,7 @@ class OrderManager:
                         
                         new_stop_order = self.api.submit_order(
                             symbol=symbol,
-                            qty=position_status['symbol'] in self.get_current_positions_qty(),  # Get actual quantity
+                            qty=abs(int(position_status['quantity'])),  # Get actual quantity from position
                             side='sell',
                             type='stop',
                             stop_price=stop_price,
@@ -414,10 +414,15 @@ class OrderManager:
                         if self.trailing_stop_manager.check_stop_triggered(symbol, current_price):
                             triggered_positions.append(symbol)
                             
-                            # Execute market sell order
+                            # Execute trailing stop sell - need to cancel existing orders first
                             position_status = self.trailing_stop_manager.get_position_status(symbol)
                             if position_status:
                                 self.logger.warning(f"[{symbol}] 🛑 EXECUTING TRAILING STOP SELL")
+                                
+                                # Cancel any existing stop loss orders for this symbol
+                                self._cancel_existing_stop_orders(symbol)
+                                
+                                # Now place the market sell order
                                 sell_result = self.place_sell_order(symbol)
                                 if sell_result:
                                     self.trailing_stop_manager.remove_position(symbol, "Trailing stop triggered")
@@ -662,3 +667,24 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"[ERROR] Failed to place cover order for {symbol}: {e}")
             return None
+    
+    def _cancel_existing_stop_orders(self, symbol: str):
+        """Cancel any existing stop loss orders for a symbol to free up shares"""
+        try:
+            # Get all active orders for this symbol
+            orders = self.api.get_orders(status='new', symbols=[symbol])
+            
+            cancelled_count = 0
+            for order in orders:
+                if order.order_type.name == 'STOP' and order.symbol == symbol:
+                    self.logger.info(f"[CANCEL] Cancelling existing stop order {order.id} for {symbol}")
+                    self.api.cancel_order_by_id(order.id)
+                    cancelled_count += 1
+            
+            if cancelled_count > 0:
+                self.logger.info(f"[SUCCESS] Cancelled {cancelled_count} stop orders for {symbol}")
+            else:
+                self.logger.info(f"[INFO] No stop orders to cancel for {symbol}")
+                
+        except Exception as e:
+            self.logger.error(f"[ERROR] Failed to cancel stop orders for {symbol}: {e}")

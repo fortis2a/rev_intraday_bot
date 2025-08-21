@@ -75,11 +75,11 @@ class IntradayEngine:
         # Sync position count with broker to fix any state mismatches
         self.risk_manager.sync_position_count_with_broker(self.order_manager)
 
-        # Initialize strategies
-        self.strategies = {
-            'momentum': MomentumStrategy(),
-            'mean_reversion': MeanReversionStrategy(),
-            'vwap_bounce': VWAPStrategy()
+        # Initialize strategy classes (will create instances per symbol)
+        self.strategy_classes = {
+            'momentum': MomentumStrategy,
+            'mean_reversion': MeanReversionStrategy,
+            'vwap_bounce': VWAPStrategy
         }
 
         # State tracking
@@ -556,8 +556,11 @@ class IntradayEngine:
 
             # Current price already retrieved above
 
-            for strategy_name, strategy in self.strategies.items():
+            for strategy_name, strategy_class in self.strategy_classes.items():
                 try:
+                    # Create strategy instance for this symbol
+                    strategy = strategy_class(symbol)
+                    
                     # Call the strategy's generate_signal method (returns dict or None)
                     strategy_signal = strategy.generate_signal(symbol, data)
                     if strategy_signal:
@@ -802,7 +805,7 @@ class IntradayEngine:
                 if new_untracked:
                     if config.ADOPT_EXISTING_POSITIONS:
                         # Adopt existing positions for management
-                        self.logger.info(f"🔄 Adopting {len(new_untracked)} existing positions for management: {new_untracked}")
+                        self.logger.info(f"[ADOPT] Adopting {len(new_untracked)} existing positions for management: {new_untracked}")
                         
                         for symbol in new_untracked:
                             # Find the actual position data for this symbol
@@ -973,11 +976,11 @@ class IntradayEngine:
                 # If signal is opposite to existing position, close the position first
                 if ((existing_side == 'buy' and signal_side == 'sell') or 
                     (existing_side == 'sell' and signal_side == 'buy')):
-                    self.logger.info(f"🔄 Closing existing {existing_side} position due to opposite {signal_side} signal for {signal.symbol}")
+                    self.logger.info(f"[CLOSE] Closing existing {existing_side} position due to opposite {signal_side} signal for {signal.symbol}")
                     return self.close_position(signal.symbol)
                 else:
                     # Same direction signal - reject to prevent accumulation
-                    self.logger.warning(f"⚠️ REJECTING {signal_side} signal for {signal.symbol} - already have {existing_side} position")
+                    self.logger.warning(f"[WARNING] REJECTING {signal_side} signal for {signal.symbol} - already have {existing_side} position")
                     self.logger.info(f"📋 FAILED: Position conflict for {signal.symbol}")
                     return False
             
@@ -991,11 +994,11 @@ class IntradayEngine:
                 # If signal is opposite to existing position, close the position
                 if ((existing_signal_type == "BUY" and signal.signal_type == "SELL") or
                     (existing_signal_type == "SELL" and signal.signal_type == "BUY")):
-                    self.logger.info(f"🔄 Closing tracked {existing_signal_type} position due to opposite {signal.signal_type} signal for {signal.symbol}")
+                    self.logger.info(f"[CLOSE] Closing tracked {existing_signal_type} position due to opposite {signal.signal_type} signal for {signal.symbol}")
                     return self.close_position(signal.symbol)
                 else:
-                    self.logger.debug(f"⚠️ Ignoring {signal.signal_type} signal for {signal.symbol} - already have {existing_signal_type} position")
-                    self.logger.info(f"📋 FAILED: Tracked position conflict for {signal.symbol}")
+                    self.logger.debug(f"[WARNING] Ignoring {signal.signal_type} signal for {signal.symbol} - already have {existing_signal_type} position")
+                    self.logger.info(f"[FAILED] FAILED: Tracked position conflict for {signal.symbol}")
                     return False
             
             self.logger.info(f"📋 CHECKPOINT 3: Tracked position checks passed for {signal.symbol}")
@@ -1987,20 +1990,20 @@ class IntradayEngine:
             print("=" * 50, file=sys.stderr)
             sys.stderr.flush()
             
-            print("🔄 ENTERING run_trading_cycle method...")  # Debug print
-            self.logger.info("🔄 Starting trading cycle...")
+            print("[CYCLE] ENTERING run_trading_cycle method...")  # Debug print
+            self.logger.info("[CYCLE] Starting trading cycle...")
             
             # CRITICAL SAFETY CHECK: Verify we have live data connection (attempt reconnection if missing)
             if not self.data_manager.ensure_connection():
-                self.logger.error("❌ CRITICAL: No live data connection after retry - stopping cycle")
+                self.logger.error("[ERROR] CRITICAL: No live data connection after retry - stopping cycle")
                 time.sleep(5)
                 return
             
-            print("🔄 Data manager check passed...")  # Debug print
+            print("[DATA] Data manager check passed...")  # Debug print
             
             # Test live data connection with first symbol from watchlist
             try:
-                test_symbol = self.watchlist[0] if self.watchlist else "SPY"
+                test_symbol = config.INTRADAY_WATCHLIST[0] if config.INTRADAY_WATCHLIST else "SPY"
                 test_price = self.data_manager.get_current_price(test_symbol)
                 if test_price is None or test_price <= 0:
                     self.logger.warning(f"⚠️ Cannot get live data for {test_symbol} - continuing anyway")
@@ -2208,16 +2211,16 @@ class IntradayEngine:
                 if not self.order_manager.initialize_trading():
                     self.logger.warning("⚠️ OrderManager trading connection failed - using existing connection")
             else:
-                self.logger.info("✅ Using existing data manager connection")
+                self.logger.info("[OK] Using existing data manager connection")
         except Exception as e:
-            self.logger.warning(f"⚠️ OrderManager initialization check failed: {e} - using existing connection")
+            self.logger.warning(f"[WARNING] OrderManager initialization check failed: {e} - using existing connection")
         
         # CRITICAL: Immediately sync with broker positions on startup
-        self.logger.info("🔄 STARTUP: Syncing with broker positions...")
+        self.logger.info("[STARTUP] STARTUP: Syncing with broker positions...")
         self.sync_positions_with_broker()
         
         # CRITICAL: Immediately check for stop loss violations after sync
-        self.logger.info("🛡️ STARTUP: Checking for stop loss violations...")
+        self.logger.info("[STARTUP] STARTUP: Checking for stop loss violations...")
         self.check_position_stop_losses()
         
         self.logger.info("✅ Engine ready - monitoring market for signals...")

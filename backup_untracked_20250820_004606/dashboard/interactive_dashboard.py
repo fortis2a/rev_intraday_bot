@@ -100,8 +100,6 @@ class TradingDashboard:
             formatted_start = buffer_start.strftime('%Y-%m-%dT%H:%M:%SZ')
             
             print(f"🔍 Fetching orders from {buffer_start.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} (EOD method)")
-            print(f"🎯 Target date range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-            print(f"📅 Today's date: {datetime.now().strftime('%Y-%m-%d')}")
             
             orders = self.api.list_orders(
                 status='all',  # Get all orders, then filter for filled
@@ -172,39 +170,30 @@ class TradingDashboard:
                         if isinstance(value, (int, float, str)) and ('pl' in attr.lower() or 'equity' in attr.lower()):
                             print(f"   {attr}: {value}")
                 
-                # Only get "day P&L" if the selected date range includes today
-                today = datetime.now().date()
-                is_today_included = (start_date.date() <= today <= end_date.date())
+                # Use the CORRECT method: current_equity - last_equity (same as data_manager)
+                current_equity = float(account.equity)
+                last_equity = float(getattr(account, 'last_equity', current_equity))
+                day_pnl = current_equity - last_equity
                 
-                if is_today_included:
-                    # Use the CORRECT method: current_equity - last_equity (same as data_manager)
-                    current_equity = float(account.equity)
-                    last_equity = float(getattr(account, 'last_equity', current_equity))
-                    day_pnl = current_equity - last_equity
-                    
-                    print(f"💰 current_equity: ${current_equity:.2f}")
-                    print(f"💰 last_equity: ${last_equity:.2f}")
-                    print(f"💰 Account Day P&L (equity difference): ${day_pnl:.2f}")
-                    
-                    # Also get portfolio history for comparison
-                    portfolio_history = self.api.get_portfolio_history(
-                        period='1D',
-                        timeframe='1Min'
-                    )
-                    
-                    day_pnl_portfolio = 0
-                    if portfolio_history.equity and len(portfolio_history.equity) > 1:
-                        day_start_equity = portfolio_history.equity[0]
-                        current_equity_history = portfolio_history.equity[-1]
-                        day_pnl_portfolio = current_equity_history - day_start_equity
-                    
-                    print(f"💰 Portfolio history P&L: ${day_pnl_portfolio:.2f}")
-                    if abs(day_pnl - day_pnl_portfolio) > 0.01:
-                        print(f"⚠️ P&L calculation difference: ${abs(day_pnl - day_pnl_portfolio):.2f}")
-                else:
-                    # For historical dates, don't use "day P&L" correction
-                    day_pnl = 0
-                    print(f"📅 Historical date range {start_date.date()} to {end_date.date()} - skipping day P&L correction")
+                print(f"💰 current_equity: ${current_equity:.2f}")
+                print(f"💰 last_equity: ${last_equity:.2f}")
+                print(f"💰 Account Day P&L (equity difference): ${day_pnl:.2f}")
+                
+                # Also get portfolio history for comparison
+                portfolio_history = self.api.get_portfolio_history(
+                    period='1D',
+                    timeframe='1Min'
+                )
+                
+                day_pnl_portfolio = 0
+                if portfolio_history.equity and len(portfolio_history.equity) > 1:
+                    day_start_equity = portfolio_history.equity[0]
+                    current_equity_history = portfolio_history.equity[-1]
+                    day_pnl_portfolio = current_equity_history - day_start_equity
+                
+                print(f"💰 Portfolio history P&L: ${day_pnl_portfolio:.2f}")
+                if abs(day_pnl - day_pnl_portfolio) > 0.01:
+                    print(f"⚠️ P&L calculation difference: ${abs(day_pnl - day_pnl_portfolio):.2f}")
                 
                 account_info = {
                     'equity': float(account.equity),
@@ -239,17 +228,7 @@ class TradingDashboard:
             df['date'] = df['filled_at'].dt.date
             df['hour'] = df['filled_at'].dt.hour
             
-            # 🔥 CRITICAL FIX: Filter data to only show trades within the requested date range
-            start_date_only = start_date.date()
-            end_date_only = end_date.date()
-            print(f"🔥 BEFORE FILTER: {len(df)} orders")
-            df = df[(df['date'] >= start_date_only) & (df['date'] <= end_date_only)]
-            print(f"🔥 AFTER FILTER: {len(df)} orders")
-            
-            print(f"🎯 Filtered to date range {start_date_only} to {end_date_only}")
-            if not df.empty:
-                print(f"📅 Dates found after filter: {sorted(df['date'].unique())}")
-            print(f"✅ Final DataFrame with {len(df)} orders, ${df['trade_value'].sum():,.2f} volume")
+            print(f"✅ Created DataFrame with {len(df)} orders, ${df['trade_value'].sum():,.2f} volume")
             
             return df, account_info
             
@@ -566,12 +545,6 @@ class TradingDashboard:
              Input('interval-component', 'n_intervals')]
         )
         def update_dashboard(start_date, end_date, selected_symbols, side_filter, refresh_clicks, intervals):
-            print(f"🔍 CALLBACK DEBUG:")
-            print(f"   start_date: {start_date} (type: {type(start_date)})")
-            print(f"   end_date: {end_date} (type: {type(end_date)})")
-            print(f"   selected_symbols: {selected_symbols}")
-            print(f"   side_filter: {side_filter}")
-            
             # Get trading data using date range
             df, account_info = self.get_trading_data(start_date, end_date)
             
@@ -582,8 +555,8 @@ class TradingDashboard:
             # Calculate P&L with target date filtering and fees included
             pnl_df = self.calculate_pnl_data(df, target_start_date, target_end_date, account_info)
             
-            # 🔥 CORRECTION: Adjust P&L to match account day P&L (only for current day data)
-            if not pnl_df.empty and account_info and 'day_pnl' in account_info and account_info['day_pnl'] != 0:
+            # 🔥 CORRECTION: Adjust P&L to match account day P&L
+            if not pnl_df.empty and account_info and 'day_pnl' in account_info:
                 trade_pnl_sum = pnl_df['pnl'].sum()
                 account_day_pnl = account_info['day_pnl']
                 
@@ -596,8 +569,6 @@ class TradingDashboard:
                     pnl_df['pnl'] = pnl_df['pnl'] * correction_factor
                     
                     print(f"🔥 CORRECTED: New trade sum ${pnl_df['pnl'].sum():.2f}")
-                else:
-                    print(f"📅 Historical data - no P&L correction applied")
             
             # Update symbol options
             if not df.empty:
@@ -857,10 +828,10 @@ class TradingDashboard:
     def create_symbol_performance(self, pnl_df):
         """Create symbol-specific equity curves using bar charts for better tooltips"""
         print("🔥 DEBUG: Creating SYMBOL EQUITY CURVES with bar charts")
+        print(f"🔥 DEBUG: Symbol P&L DataFrame sum: ${pnl_df['pnl'].sum():.2f}")  # Debug
         fig = go.Figure()
         
         if pnl_df.empty:
-            print("🔥 DEBUG: Symbol P&L DataFrame is empty - no data to display")
             fig.add_annotation(
                 text="No symbol data available",
                 xref="paper", yref="paper",
@@ -869,7 +840,6 @@ class TradingDashboard:
                 font=dict(size=16, color="gray")
             )
         else:
-            print(f"🔥 DEBUG: Symbol P&L DataFrame sum: ${pnl_df['pnl'].sum():.2f}")  # Debug
             # Color palette for symbols
             colors = ['#00d4ff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c']
             color_idx = 0

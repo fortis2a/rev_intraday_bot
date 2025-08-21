@@ -13,7 +13,7 @@ import yfinance as yf
 class RealTimeConfidenceCalculator:
     def __init__(self):
         self.base_confidence = 85.0  # Starting point
-        self.min_confidence_threshold = 75.0
+        self.min_confidence_threshold = 70.0  # Match config.py setting (lowered from 75%)
         self.indicator_weights = {
             'macd_alignment': 15,    # MACD signal strength
             'ema_trend': 15,         # EMA trend alignment
@@ -254,7 +254,7 @@ class RealTimeConfidenceCalculator:
         Calculate real-time confidence level for a stock
         Returns confidence score and component breakdown
         """
-        print(f"\n🔄 Calculating real-time confidence for {symbol}...")
+        print(f"\n[CALC] Calculating real-time confidence for {symbol}...")
         
         # Get live market data
         data = self.get_live_market_data(symbol)
@@ -308,7 +308,7 @@ class RealTimeConfidenceCalculator:
             }
         }
         
-        print(f"✅ {symbol}: {final_confidence:.1f}% confidence ({'TRADEABLE' if tradeable else 'SKIP'})")
+        print(f"[OK] {symbol}: {final_confidence:.1f}% confidence ({'TRADEABLE' if tradeable else 'SKIP'})")
         
         return result
 
@@ -319,7 +319,7 @@ def main():
     # Test with budget watchlist
     test_symbols = ['SOXL', 'SOFI', 'TQQQ', 'INTC', 'NIO']
     
-    print("🔄 REAL-TIME CONFIDENCE CALCULATION TEST")
+    print("[TEST] REAL-TIME CONFIDENCE CALCULATION TEST")
     print("=" * 60)
     
     results = []
@@ -327,18 +327,18 @@ def main():
         result = calculator.calculate_real_time_confidence(symbol, 1.0)
         results.append(result)
     
-    print(f"\n📊 REAL-TIME RESULTS SUMMARY:")
+    print(f"\n[SUMMARY] REAL-TIME RESULTS SUMMARY:")
     print("-" * 50)
     
     tradeable_count = 0
     for result in results:
         if result['confidence'] > 0:
-            status = "🟢 TRADE" if result['tradeable'] else "🔴 SKIP"
+            status = "[TRADE]" if result['tradeable'] else "[SKIP]"
             print(f"{result['symbol']}: {result['confidence']:.1f}% {status}")
             if result['tradeable']:
                 tradeable_count += 1
     
-    print(f"\n✅ {tradeable_count}/{len(test_symbols)} stocks currently tradeable")
+    print(f"\n[SUMMARY] {tradeable_count}/{len(test_symbols)} stocks currently tradeable")
     
     return results
 

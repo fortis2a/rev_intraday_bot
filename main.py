@@ -266,13 +266,31 @@ class IntradayEngine:
             self.logger.error(f"[RECOVERY] Error recovering positions: {e}")
     
     def is_market_hours(self):
-        """Check if market is currently open"""
+        """Check if we're in valid trading hours with 30-min buffer"""
         try:
-            # Get market status from Alpaca
+            # First check if market is actually open
             market_status = self.data_manager.get_market_status()
-            return market_status.get('is_open', False)
+            if not market_status.get('is_open', False):
+                return False
+            
+            # Market is open, now check our trading hour restrictions
+            now = datetime.now()
+            current_time = now.strftime("%H:%M")
+            
+            # Check if it's a weekday
+            if now.weekday() >= 5:  # Saturday = 5, Sunday = 6
+                return False
+            
+            # Apply 30-minute buffer restrictions
+            # Trading starts 30 min after market open (10:00 AM)
+            # Trading ends 30 min before market close (3:30 PM)
+            if config['TRADING_START'] <= current_time <= config['TRADING_END']:
+                return True
+            
+            return False
+            
         except:
-            # Fallback to time-based check
+            # Fallback to time-based check with restrictions
             now = datetime.now().time()
             return config['MARKET_OPEN'] <= now <= config['MARKET_CLOSE']
     
@@ -375,7 +393,7 @@ class IntradayEngine:
                             # Remove from active positions
                             if symbol in self.active_positions:
                                 del self.active_positions[symbol]
-                            self.logger.info(f"[EXECUTED] ⚡ SHORT COVER: {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                            self.logger.info(f"[EXECUTED] SHORT COVER: {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
                             return True
                 else:
                     # No position - place regular buy order
@@ -386,7 +404,7 @@ class IntradayEngine:
                         
                         # Enhanced logging for watched stocks
                         if was_watched:
-                            self.logger.info(f"[EXECUTED] ⭐ PRIORITY BUY: {symbol} (was overbought, now oversold) - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                            self.logger.info(f"[EXECUTED] PRIORITY BUY: {symbol} (was overbought, now oversold) - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
                             # Remove from watch list
                             del self.stocks_to_watch[symbol]
                         else:
@@ -417,7 +435,7 @@ class IntradayEngine:
                         if order_result:
                             self.trade_count += 1
                             self.active_positions[symbol] = order_result
-                            self.logger.info(f"[EXECUTED] 🔴 SHORT SELL: {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
+                            self.logger.info(f"[EXECUTED] SHORT SELL: {symbol} - Trade #{self.trade_count} | Confidence: {trade_decision['confidence']:.1f}%")
                             return True
                         else:
                             # Short selling failed - add to watch list
