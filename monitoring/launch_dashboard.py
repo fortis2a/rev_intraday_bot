@@ -27,11 +27,12 @@ import subprocess
 def main():
     """Launch the interactive trading dashboard"""
     
-    # Get the current script directory (root of project)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Get the current script directory (monitoring folder) and then parent (root of project)
+    monitoring_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(monitoring_dir)
     
-    # Path to the dashboard script
-    dashboard_path = os.path.join(script_dir, 'dashboard', 'interactive_dashboard.py')
+    # Path to the dashboard script (in monitoring directory)
+    dashboard_path = os.path.join(monitoring_dir, 'live_dashboard.py')
     
     # Check if dashboard exists
     if not os.path.exists(dashboard_path):
@@ -40,7 +41,7 @@ def main():
         return 1
     
     # Get the virtual environment python path
-    venv_python = os.path.join(script_dir, '.venv', 'Scripts', 'python.exe')
+    venv_python = os.path.join(project_root, '.venv', 'Scripts', 'python.exe')
     
     if not os.path.exists(venv_python):
         print("❌ Error: Virtual environment not found")
@@ -54,8 +55,8 @@ def main():
     print("=" * 60)
     
     try:
-        # Launch the dashboard
-        subprocess.run([venv_python, dashboard_path], check=True)
+        # Launch the dashboard with proper working directory
+        subprocess.run([venv_python, dashboard_path], cwd=project_root, check=True)
     except subprocess.CalledProcessError as e:
         print(f"❌ Error launching dashboard: {e}")
         return 1

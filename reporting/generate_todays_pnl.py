@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime, date
 
 # Add project root to path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from alpaca.trading.client import TradingClient

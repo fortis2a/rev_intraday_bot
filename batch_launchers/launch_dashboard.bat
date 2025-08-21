@@ -17,7 +17,7 @@ echo Press Ctrl+C to stop the dashboard
 echo.
 
 REM Launch the dashboard using the Python launcher
-python launch_dashboard.py
+python monitoring\launch_dashboard.py
 
 echo.
 echo Dashboard stopped.
