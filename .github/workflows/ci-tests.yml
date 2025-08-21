@@ -47,12 +47,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Create dummy environment file
+        run: |
+          echo "ALPACA_API_KEY=DUMMY_KEY" > .env
+          echo "ALPACA_SECRET_KEY=DUMMY_SECRET" >> .env
+          echo "ALPACA_BASE_URL=https://paper-api.alpaca.markets" >> .env
+          echo "ALPACA_TRADING_ENV=paper" >> .env
+
       - name: Run tests with coverage
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY || 'DUMMY_KEY' }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY || 'DUMMY_SECRET' }}
         run: |
-          pytest --cov-report=xml
+          pytest tests/ --cov=. --cov-report=xml --tb=short
 
       - name: Upload coverage XML
         if: always()

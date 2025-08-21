@@ -1,8 +1,23 @@
+# Core trading dependencies
 alpaca-trade-api==3.1.1
+alpaca-py>=0.5.0
 pandas>=1.5.0
 numpy>=1.21.0
 python-dotenv>=0.19.0
 
+# Technical analysis
+talib-binary>=0.4.19
+
+# Web dashboard dependencies  
+dash>=2.10.0
+plotly>=5.0.0
+dash-bootstrap-components>=1.4.0
+
 # Testing dependencies
 pytest>=7.0.0
 pytest-cov>=4.0.0
+
+# Additional utilities
+requests>=2.28.0
+pytz>=2022.0
+websockets>=10.0
