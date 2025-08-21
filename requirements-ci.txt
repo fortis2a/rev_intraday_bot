@@ -1,19 +1,19 @@
-# CI-specific requirements (no complex dependencies)
-# Core trading dependencies
-alpaca-trade-api==3.1.1
-alpaca-py>=0.5.0
+# CI-specific requirements (minimal for testing only)
+# Core dependencies
 pandas>=1.5.0
 numpy>=1.21.0
 python-dotenv>=0.19.0
+
+# Alpaca trading (legacy API only for CI)
+alpaca-trade-api==3.1.1
 
 # Testing dependencies
 pytest>=7.0.0
 pytest-cov>=4.0.0
 
-# Additional utilities
+# Basic utilities
 requests>=2.28.0
 pytz>=2022.0
-websockets>=10.0
 
-# Note: TA-Lib and Dash dependencies excluded for CI
-# These are only needed for full local development
+# Note: alpaca-py, websockets, aiohttp excluded for CI compatibility
+# These cause build issues on Python 3.12 in CI environment
