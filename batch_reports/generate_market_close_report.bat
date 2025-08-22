@@ -15,7 +15,7 @@ echo.
 call "C:\Users\will7\OneDrive - Sygma Data Analytics\Stock Trading\Scalping Bot System\.venv\Scripts\activate.bat"
 
 echo 🔄 Generating market close report with statistical analysis...
-python "C:\Users\will7\OneDrive - Sygma Data Analytics\Stock Trading\Scalping Bot System\market_close_report.py"
+python "C:\Users\will7\OneDrive - Sygma Data Analytics\Stock Trading\Scalping Bot System\reporting\market_close_report.py"
 
 echo.
 echo ✅ Market close report generation complete!
@@ -34,8 +34,8 @@ echo.
 echo Generating comprehensive end-of-day analysis...
 echo.
 
-cd /d "%~dp0"
-".venv\Scripts\python.exe" market_close_report.py
+cd /d "%~dp0\.."
+".venv\Scripts\python.exe" reporting\market_close_report.py
 
 echo.
 echo ========================================
