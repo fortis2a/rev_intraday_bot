@@ -118,11 +118,12 @@ class MarketCloseReportGenerator:
     def analyze_trade_performance(self, today_activities, yesterday_activities):
         """Analyze trade performance with detailed insights and statistical analysis"""
         
-        # For daily market close report, focus on TODAY's activities only
-        # Yesterday's data is kept for comparison but not included in main analysis
-        all_activities = today_activities  # Changed: Only use today's data
+        # For P&L calculation, we need to include yesterday's trades that were closed today
+        # This ensures we capture the full P&L picture for positions closed today
+        combined_activities = yesterday_activities + today_activities  # All activities for P&L
+        today_only_activities = today_activities  # Today's activities for trade counting
         
-        if not all_activities:
+        if not today_only_activities:
             return {
                 'trade_summary': {},
                 'time_analysis': {},
@@ -137,13 +138,13 @@ class MarketCloseReportGenerator:
                 }
             }
         
-        # Convert to DataFrame for easier analysis
-        trades_data = []
-        for activity in all_activities:
+        # Convert TODAY's activities to DataFrame for trade counting and timing analysis
+        today_trades_data = []
+        for activity in today_only_activities:
             # Handle both activities and orders (fallback)
             if hasattr(activity, 'transaction_time'):
                 # This is an activity
-                trades_data.append({
+                today_trades_data.append({
                     'symbol': activity.symbol,
                     'side': activity.side,
                     'qty': float(activity.qty),
@@ -157,7 +158,7 @@ class MarketCloseReportGenerator:
                 })
             else:
                 # This is an order (fallback)
-                trades_data.append({
+                today_trades_data.append({
                     'symbol': activity.symbol,
                     'side': activity.side,
                     'qty': float(activity.filled_qty),
@@ -170,34 +171,74 @@ class MarketCloseReportGenerator:
                     'minute': activity.filled_at.minute
                 })
         
-        df = pd.DataFrame(trades_data)
+        # Convert COMBINED activities (yesterday + today) to DataFrame for P&L calculation
+        combined_trades_data = []
+        for activity in combined_activities:
+            # Handle both activities and orders (fallback)
+            if hasattr(activity, 'transaction_time'):
+                # This is an activity
+                combined_trades_data.append({
+                    'symbol': activity.symbol,
+                    'side': activity.side,
+                    'qty': float(activity.qty),
+                    'price': float(activity.price),
+                    'value': float(activity.qty) * float(activity.price),
+                    'filled_at': activity.transaction_time,
+                    'activity_id': activity.id,
+                    'date': activity.transaction_time.date(),
+                    'hour': activity.transaction_time.hour,
+                    'minute': activity.transaction_time.minute
+                })
+            else:
+                # This is an order (fallback)
+                combined_trades_data.append({
+                    'symbol': activity.symbol,
+                    'side': activity.side,
+                    'qty': float(activity.filled_qty),
+                    'price': float(activity.filled_avg_price),
+                    'value': float(activity.filled_qty) * float(activity.filled_avg_price),
+                    'filled_at': activity.filled_at,
+                    'activity_id': activity.id,
+                    'date': activity.filled_at.date(),
+                    'hour': activity.filled_at.hour,
+                    'minute': activity.filled_at.minute
+                })
         
-        # Calculate actual P&L based on cash flows (more accurate for short selling)
-        df_with_pnl = self._calculate_cash_flow_pnl(df)
+        # Use today's data for trade counting and timing analysis
+        df_today = pd.DataFrame(today_trades_data)
         
-        # Analyze by symbol with P&L calculation
-        symbol_analysis = self._analyze_symbol_performance(df_with_pnl)
+        # Use combined data for P&L calculation (includes yesterday's opens closed today)
+        df_combined = pd.DataFrame(combined_trades_data)
         
-        # Analyze by time of day
-        time_analysis = self._analyze_time_performance(df_with_pnl)
+        # Calculate actual P&L based on combined data (yesterday + today)
+        df_with_pnl = self._calculate_cash_flow_pnl(df_combined)
         
-        # Analyze by trade side (long/short)
-        side_analysis = self._analyze_side_performance(df_with_pnl)
+        # Filter P&L results to only show realized P&L from trades closed TODAY
+        df_pnl_today_closes = self._filter_pnl_for_today_closes(df_with_pnl, self.today)
         
-        # Statistical analysis
-        statistical_analysis = self._perform_statistical_analysis(df_with_pnl)
+        # Analyze by symbol with P&L calculation (using combined data for accurate P&L)
+        symbol_analysis = self._analyze_symbol_performance(df_pnl_today_closes)
+        
+        # Analyze by time of day (using today's activities for timing)
+        time_analysis = self._analyze_time_performance(df_today)
+        
+        # Analyze by trade side (using P&L data)
+        side_analysis = self._analyze_side_performance(df_pnl_today_closes)
+        
+        # Statistical analysis (using P&L data)
+        statistical_analysis = self._perform_statistical_analysis(df_pnl_today_closes)
         
         # Risk metrics
-        risk_metrics = self._calculate_risk_metrics(df_with_pnl)
+        risk_metrics = self._calculate_risk_metrics(df_pnl_today_closes)
         
         # Trading psychology metrics
-        trading_psychology = self._analyze_trading_psychology(df_with_pnl)
+        trading_psychology = self._analyze_trading_psychology(df_pnl_today_closes)
         
         # Generate trading recommendations
         recommendations = self._generate_recommendations(symbol_analysis, time_analysis, side_analysis, statistical_analysis, risk_metrics)
         
         return {
-            'trade_summary': self._get_trade_summary(df_with_pnl),
+            'trade_summary': self._get_trade_summary_with_combined_data(df_combined, self.today),
             'time_analysis': time_analysis,
             'side_analysis': side_analysis,
             'symbol_performance': symbol_analysis,
@@ -205,8 +246,8 @@ class MarketCloseReportGenerator:
             'risk_metrics': risk_metrics,
             'trading_psychology': trading_psychology,
             'recommendations': recommendations,
-            'trades_data': df_with_pnl,  # Include the completed trades data for equity curve
-            'raw_data': df,
+            'trades_data': df_pnl_today_closes,  # Include the completed trades data for equity curve
+            'raw_data': df_today,  # Today's raw data for reference
             'comparison_data': {
                 'yesterday_summary': self._get_yesterday_summary(yesterday_activities)
             }
@@ -240,36 +281,67 @@ class MarketCloseReportGenerator:
         }
 
     def _analyze_symbol_performance(self, df):
-        """Analyze performance by symbol using cash flow data"""
+        """Analyze performance by symbol using REALIZED P&L data"""
         symbol_stats = {}
         
         for symbol in df['symbol'].unique():
             symbol_trades = df[df['symbol'] == symbol]
             
-            # For activities-based analysis, calculate performance differently
-            total_cash_flow = symbol_trades['cash_flow'].sum()
+            # Calculate realized P&L for this symbol using FIFO matching
+            symbol_trades_sorted = symbol_trades.sort_values('filled_at')
+            buys = symbol_trades_sorted[symbol_trades_sorted['side'] == 'buy'].copy()
+            sells = symbol_trades_sorted[symbol_trades_sorted['side'].isin(['sell', 'sell_short'])].copy()
+            
+            # FIFO matching for realized P&L calculation
+            buy_queue = buys.to_dict('records')
+            symbol_realized_pnl = 0
+            
+            for _, sell_row in sells.iterrows():
+                sell_qty_remaining = sell_row['qty']
+                sell_price = sell_row['price']
+                
+                while sell_qty_remaining > 0 and buy_queue:
+                    buy = buy_queue[0]
+                    buy_price = buy['price']
+                    
+                    if buy['qty'] <= sell_qty_remaining:
+                        # Full buy order matched
+                        matched_qty = buy['qty']
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        symbol_realized_pnl += realized_pnl
+                        
+                        sell_qty_remaining -= matched_qty
+                        buy_queue.pop(0)  # Remove fully matched buy
+                    else:
+                        # Partial buy order matched
+                        matched_qty = sell_qty_remaining
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        symbol_realized_pnl += realized_pnl
+                        
+                        buy['qty'] -= matched_qty  # Reduce buy quantity
+                        sell_qty_remaining = 0
+            
             total_volume = symbol_trades['value'].sum()
             
             # Count different types of activities
-            buys = symbol_trades[symbol_trades['side'] == 'buy']
-            sells = symbol_trades[symbol_trades['side'] == 'sell']
+            sells_regular = symbol_trades[symbol_trades['side'] == 'sell']
             sell_shorts = symbol_trades[symbol_trades['side'] == 'sell_short']
             
             # Trade timing analysis
             trade_times = symbol_trades['hour'].tolist()
             avg_trade_time = np.mean(trade_times) if trade_times else 0
             
-            # Calculate percentage return based on total trade value
-            pnl_pct = (total_cash_flow / total_volume * 100) if total_volume > 0 else 0
+            # Calculate percentage return based on realized P&L
+            pnl_pct = (symbol_realized_pnl / total_volume * 100) if total_volume > 0 else 0
             
             symbol_stats[symbol] = {
                 'total_trades': len(symbol_trades),
                 'total_volume': total_volume,
-                'pnl': total_cash_flow,
+                'pnl': symbol_realized_pnl,  # Use realized P&L
                 'pnl_pct': pnl_pct,
                 'avg_trade_time': avg_trade_time,
-                'buys': len(buys) + len(sell_shorts),  # Include short sales as "sells"
-                'sells': len(sells),
+                'buys': len(buys),
+                'sells': len(sells_regular) + len(sell_shorts),  # Include short sales as "sells"
                 'avg_buy_price': buys['price'].mean() if len(buys) > 0 else 0,
                 'avg_sell_price': sells['price'].mean() if len(sells) > 0 else 0,
                 'trade_times': trade_times,
@@ -372,20 +444,61 @@ class MarketCloseReportGenerator:
         return side_stats
 
     def _calculate_cash_flow_pnl(self, df):
-        """Calculate P&L based on actual cash flows - more accurate for short selling"""
+        """Calculate P&L based on REALIZED trades only (FIFO matching) - FIXED VERSION"""
         trades_with_pnl = []
         
-        # Calculate net cash flow (this is the actual P&L)
-        total_cash_flow = 0
+        # Group by symbol for proper P&L calculation
+        symbol_realized_pnl = {}
+        
+        for symbol in df['symbol'].unique():
+            symbol_trades = df[df['symbol'] == symbol].sort_values('filled_at')
+            
+            # Separate buys and sells
+            buys = symbol_trades[symbol_trades['side'] == 'buy'].copy()
+            sells = symbol_trades[symbol_trades['side'].isin(['sell', 'sell_short'])].copy()
+            
+            # FIFO matching for realized P&L calculation
+            buy_queue = buys.to_dict('records')
+            symbol_realized = 0
+            
+            for _, sell_row in sells.iterrows():
+                sell_qty_remaining = sell_row['qty']
+                sell_price = sell_row['price']
+                
+                while sell_qty_remaining > 0 and buy_queue:
+                    buy = buy_queue[0]
+                    buy_price = buy['price']
+                    
+                    if buy['qty'] <= sell_qty_remaining:
+                        # Full buy order matched
+                        matched_qty = buy['qty']
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        symbol_realized += realized_pnl
+                        
+                        sell_qty_remaining -= matched_qty
+                        buy_queue.pop(0)  # Remove fully matched buy
+                    else:
+                        # Partial buy order matched
+                        matched_qty = sell_qty_remaining
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        symbol_realized += realized_pnl
+                        
+                        buy['qty'] -= matched_qty  # Reduce buy quantity
+                        sell_qty_remaining = 0
+            
+            symbol_realized_pnl[symbol] = symbol_realized
+        
+        # Create trade records with realized P&L
+        total_realized_pnl = 0
         for _, trade in df.iterrows():
-            if trade['side'] in ['sell', 'sell_short']:
-                # Money comes in
-                cash_flow = trade['value']
-                total_cash_flow += cash_flow
-            else:
-                # Money goes out 
-                cash_flow = -trade['value']
-                total_cash_flow += cash_flow
+            # Use realized P&L for calculations instead of cash flow
+            symbol_pnl = symbol_realized_pnl.get(trade['symbol'], 0)
+            
+            # Distribute the symbol's realized P&L across its trades proportionally
+            symbol_trades_count = len(df[df['symbol'] == trade['symbol']])
+            trade_realized_pnl = symbol_pnl / symbol_trades_count if symbol_trades_count > 0 else 0
+            
+            total_realized_pnl += trade_realized_pnl
             
             trades_with_pnl.append({
                 'symbol': trade['symbol'],
@@ -396,12 +509,13 @@ class MarketCloseReportGenerator:
                 'qty': trade['qty'],               # Keep original column name
                 'quantity': trade['qty'],          # Also provide quantity alias
                 'value': trade['value'],
-                'cash_flow': cash_flow,
-                'cumulative_pnl': total_cash_flow,
+                'cash_flow': trade_realized_pnl,  # Use realized P&L instead of cash flow
+                'cumulative_pnl': total_realized_pnl,
                 'hour': trade['hour'],
                 'minute': trade.get('minute', 0),
                 'date': trade.get('date', trade['filled_at'].date()),
-                'trade_type': 'SHORT' if trade['side'] == 'sell_short' else 'LONG'
+                'trade_type': 'SHORT' if trade['side'] == 'sell_short' else 'LONG',
+                'realized_pnl': trade_realized_pnl  # Add explicit realized P&L field
             })
         
         df_pnl = pd.DataFrame(trades_with_pnl)
@@ -410,7 +524,7 @@ class MarketCloseReportGenerator:
         if not df_pnl.empty:
             df_pnl['running_total'] = df_pnl['cash_flow'].cumsum()
             
-            # Calculate daily totals
+            # Calculate daily totals using realized P&L
             df_pnl['daily_pnl'] = df_pnl.groupby(df_pnl['timestamp'].dt.date)['cash_flow'].cumsum()
         
         return df_pnl
@@ -887,22 +1001,52 @@ class MarketCloseReportGenerator:
         return recommendations
 
     def _get_trade_summary(self, df):
-        """Get overall trade summary with correct cash flow calculation"""
+        """Get overall trade summary with REALIZED P&L calculation"""
         if df.empty:
             return {}
         
-        # Calculate actual P&L from cash flows
-        total_cash_flow = 0
-        for _, trade in df.iterrows():
-            if trade['side'] in ['sell', 'sell_short']:
-                total_cash_flow += trade['value']  # Money in
-            else:
-                total_cash_flow -= trade['value']  # Money out
+        # Calculate realized P&L by symbol using FIFO matching
+        total_realized_pnl = 0
         
+        for symbol in df['symbol'].unique():
+            symbol_trades = df[df['symbol'] == symbol].sort_values('filled_at')
+            
+            # Separate buys and sells
+            buys = symbol_trades[symbol_trades['side'] == 'buy'].copy()
+            sells = symbol_trades[symbol_trades['side'].isin(['sell', 'sell_short'])].copy()
+            
+            # FIFO matching for realized P&L calculation
+            buy_queue = buys.to_dict('records')
+            
+            for _, sell_row in sells.iterrows():
+                sell_qty_remaining = sell_row['qty']
+                sell_price = sell_row['price']
+                
+                while sell_qty_remaining > 0 and buy_queue:
+                    buy = buy_queue[0]
+                    buy_price = buy['price']
+                    
+                    if buy['qty'] <= sell_qty_remaining:
+                        # Full buy order matched
+                        matched_qty = buy['qty']
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        total_realized_pnl += realized_pnl
+                        
+                        sell_qty_remaining -= matched_qty
+                        buy_queue.pop(0)  # Remove fully matched buy
+                    else:
+                        # Partial buy order matched
+                        matched_qty = sell_qty_remaining
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        total_realized_pnl += realized_pnl
+                        
+                        buy['qty'] -= matched_qty  # Reduce buy quantity
+                        sell_qty_remaining = 0
+
         return {
             'total_trades': len(df),
             'total_volume': df['value'].sum(),
-            'net_pnl': total_cash_flow,  # Actual P&L
+            'net_pnl': total_realized_pnl,  # Use realized P&L instead of cash flow
             'unique_symbols': df['symbol'].nunique(),
             'buy_orders': len(df[df['side'] == 'buy']),
             'sell_orders': len(df[df['side'] == 'sell']),
@@ -911,6 +1055,136 @@ class MarketCloseReportGenerator:
             'last_trade': df['filled_at'].max(),
             'trading_span_hours': (df['filled_at'].max() - df['filled_at'].min()).total_seconds() / 3600
         }
+
+    def _get_trade_summary_with_combined_data(self, df_combined, today_date):
+        """Get trade summary using TODAY-ONLY activities for accurate P&L matching with Alpaca"""
+        if df_combined.empty:
+            return {}
+        
+        # Filter to TODAY'S activities only - this best matches Alpaca's portfolio calculation
+        today_activities = df_combined[df_combined['filled_at'].dt.date == today_date].copy()
+        
+        if today_activities.empty:
+            return {}
+        
+        # Calculate realized P&L using TODAY-ONLY activities (FIFO matching)
+        total_realized_pnl = 0
+        
+        # Group by symbol and side for today's activities
+        buys_today = {}
+        sells_today = {}
+        
+        for _, activity in today_activities.iterrows():
+            symbol = activity['symbol']
+            side = activity['side']
+            qty = float(activity['qty'])
+            price = float(activity['price'])
+            
+            if side == 'buy':
+                if symbol not in buys_today:
+                    buys_today[symbol] = []
+                buys_today[symbol].append((qty, price))
+            else:  # sell or sell_short
+                if symbol not in sells_today:
+                    sells_today[symbol] = []
+                sells_today[symbol].append((qty, price))
+        
+        # Calculate P&L for symbols that have both buys and sells today
+        for symbol in sells_today:
+            if symbol in buys_today:
+                buy_queue = buys_today[symbol][:]
+                symbol_pnl = 0
+                
+                for sell_qty, sell_price in sells_today[symbol]:
+                    remaining_sell = sell_qty
+                    
+                    while remaining_sell > 0 and buy_queue:
+                        buy_qty, buy_price = buy_queue[0]
+                        
+                        match_qty = min(remaining_sell, buy_qty)
+                        pnl = match_qty * (sell_price - buy_price)
+                        symbol_pnl += pnl
+                        
+                        remaining_sell -= match_qty
+                        buy_queue[0] = (buy_qty - match_qty, buy_price)
+                        
+                        if buy_queue[0][0] == 0:
+                            buy_queue.pop(0)
+                
+                total_realized_pnl += symbol_pnl
+
+        return {
+            'total_trades': len(today_activities),
+            'total_volume': today_activities['value'].sum(),
+            'net_pnl': total_realized_pnl,  # Today-only realized P&L (closest match to Alpaca)
+            'unique_symbols': today_activities['symbol'].nunique(),
+            'buy_orders': len(today_activities[today_activities['side'] == 'buy']),
+            'sell_orders': len(today_activities[today_activities['side'] == 'sell']),
+            'short_sell_orders': len(today_activities[today_activities['side'] == 'sell_short']) if 'sell_short' in today_activities['side'].values else 0,
+            'first_trade': today_activities['filled_at'].min() if not today_activities.empty else None,
+            'last_trade': today_activities['filled_at'].max() if not today_activities.empty else None,
+            'trading_span_hours': (today_activities['filled_at'].max() - today_activities['filled_at'].min()).total_seconds() / 3600 if not today_activities.empty else 0
+        }
+
+    def _filter_pnl_for_today_closes(self, df_with_pnl, today_date):
+        """Filter P&L data to only include trades that resulted in positions closed today"""
+        if df_with_pnl.empty:
+            return df_with_pnl
+        
+        # Create a new DataFrame that includes P&L calculations for positions closed today
+        filtered_trades = []
+        
+        for symbol in df_with_pnl['symbol'].unique():
+            symbol_trades = df_with_pnl[df_with_pnl['symbol'] == symbol].sort_values('filled_at')
+            
+            # Get sells that happened today (position closes)
+            today_sells = symbol_trades[
+                (symbol_trades['side'].isin(['sell', 'sell_short'])) &
+                (symbol_trades['filled_at'].dt.date == today_date)
+            ]
+            
+            # Get all buys for this symbol (including yesterday)
+            buys = symbol_trades[symbol_trades['side'] == 'buy'].copy()
+            
+            # For each today's sell, calculate the realized P&L
+            buy_queue = buys.to_dict('records')
+            
+            for _, sell_row in today_sells.iterrows():
+                sell_qty_remaining = sell_row['qty']
+                sell_price = sell_row['price']
+                
+                # Calculate realized P&L for this sell
+                sell_realized_pnl = 0
+                temp_buy_queue = buy_queue.copy()
+                
+                while sell_qty_remaining > 0 and temp_buy_queue:
+                    buy = temp_buy_queue[0]
+                    buy_price = buy['price']
+                    
+                    if buy['qty'] <= sell_qty_remaining:
+                        # Full buy order matched
+                        matched_qty = buy['qty']
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        sell_realized_pnl += realized_pnl
+                        
+                        sell_qty_remaining -= matched_qty
+                        temp_buy_queue.pop(0)
+                    else:
+                        # Partial buy order matched
+                        matched_qty = sell_qty_remaining
+                        realized_pnl = matched_qty * (sell_price - buy_price)
+                        sell_realized_pnl += realized_pnl
+                        
+                        buy['qty'] -= matched_qty
+                        sell_qty_remaining = 0
+                
+                # Add this trade with its realized P&L
+                trade_record = sell_row.to_dict()
+                trade_record['cash_flow'] = sell_realized_pnl
+                trade_record['realized_pnl'] = sell_realized_pnl
+                filtered_trades.append(trade_record)
+        
+        return pd.DataFrame(filtered_trades) if filtered_trades else pd.DataFrame()
 
     def create_charts(self, analysis_data):
         """Create comprehensive visualization charts including statistical analysis"""
