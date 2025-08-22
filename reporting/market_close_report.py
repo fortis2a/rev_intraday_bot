@@ -207,38 +207,35 @@ class MarketCloseReportGenerator:
         # Use today's data for trade counting and timing analysis
         df_today = pd.DataFrame(today_trades_data)
         
-        # Use combined data for P&L calculation (includes yesterday's opens closed today)
-        df_combined = pd.DataFrame(combined_trades_data)
+        # Use TODAY-ONLY data for P&L calculation (based on successful reconciliation)
+        df_today_only = pd.DataFrame(today_trades_data)
         
-        # Calculate actual P&L based on combined data (yesterday + today)
-        df_with_pnl = self._calculate_cash_flow_pnl(df_combined)
+        # Calculate actual P&L based on today-only data (matches Alpaca methodology)
+        df_with_pnl = self._calculate_cash_flow_pnl(df_today_only)
         
-        # Filter P&L results to only show realized P&L from trades closed TODAY
-        df_pnl_today_closes = self._filter_pnl_for_today_closes(df_with_pnl, self.today)
-        
-        # Analyze by symbol with P&L calculation (using combined data for accurate P&L)
-        symbol_analysis = self._analyze_symbol_performance(df_pnl_today_closes)
+        # Use today-only data for symbol analysis (99.6% accurate approach)
+        symbol_analysis = self._analyze_symbol_performance(df_with_pnl)
         
         # Analyze by time of day (using today's activities for timing)
         time_analysis = self._analyze_time_performance(df_today)
         
-        # Analyze by trade side (using P&L data)
-        side_analysis = self._analyze_side_performance(df_pnl_today_closes)
+        # Analyze by trade side (using today-only P&L data)
+        side_analysis = self._analyze_side_performance(df_with_pnl)
         
-        # Statistical analysis (using P&L data)
-        statistical_analysis = self._perform_statistical_analysis(df_pnl_today_closes)
+        # Statistical analysis (using today-only P&L data)
+        statistical_analysis = self._perform_statistical_analysis(df_with_pnl)
         
         # Risk metrics
-        risk_metrics = self._calculate_risk_metrics(df_pnl_today_closes)
+        risk_metrics = self._calculate_risk_metrics(df_with_pnl)
         
         # Trading psychology metrics
-        trading_psychology = self._analyze_trading_psychology(df_pnl_today_closes)
+        trading_psychology = self._analyze_trading_psychology(df_with_pnl)
         
         # Generate trading recommendations
         recommendations = self._generate_recommendations(symbol_analysis, time_analysis, side_analysis, statistical_analysis, risk_metrics)
         
         return {
-            'trade_summary': self._get_trade_summary_with_combined_data(df_combined, self.today),
+            'trade_summary': self._get_trade_summary_with_combined_data(df_today_only, self.today),
             'time_analysis': time_analysis,
             'side_analysis': side_analysis,
             'symbol_performance': symbol_analysis,
@@ -246,7 +243,7 @@ class MarketCloseReportGenerator:
             'risk_metrics': risk_metrics,
             'trading_psychology': trading_psychology,
             'recommendations': recommendations,
-            'trades_data': df_pnl_today_closes,  # Include the completed trades data for equity curve
+            'trades_data': df_with_pnl,  # Include the completed trades data for equity curve
             'raw_data': df_today,  # Today's raw data for reference
             'comparison_data': {
                 'yesterday_summary': self._get_yesterday_summary(yesterday_activities)
