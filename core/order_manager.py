@@ -400,7 +400,10 @@ class OrderManager:
         try:
             if not config['TRAILING_STOP_ENABLED']:
                 return []
-            
+
+            # First, sync trailing stop manager with actual account positions
+            self.trailing_stop_manager.sync_with_account_positions(self.data_manager)
+
             triggered_positions = []
             
             for symbol in list(self.trailing_stop_manager.active_positions.keys()):

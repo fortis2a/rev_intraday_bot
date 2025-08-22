@@ -690,10 +690,25 @@ while True:
                     try:
                         print("[INFO] Engine is running. Press Ctrl+C to stop.")
                         # Let it run and show live output
+                        print("[INFO] Engine running in background. Logs available in 'logs/' directory.")
+                        print("[INFO] Press Ctrl+C to stop the engine.")
+                        
+                        # Simple monitoring with periodic status updates
+                        last_update = time.time()
+                        cycle_count = 0
+                        
                         while process.poll() is None:
-                            time.sleep(2)
-                            # Show recent logs
-                            self.show_recent_activity()
+                            time.sleep(5)  # Check every 5 seconds
+                            cycle_count += 1
+                            
+                            # Show status update every 30 seconds (6 cycles)
+                            if cycle_count % 6 == 0:
+                                current_time = datetime.now().strftime('%H:%M:%S')
+                                print(f"[STATUS] {current_time} - Engine running (PID: {process.pid}) - Cycle {cycle_count}")
+                                
+                                # Show very recent activity occasionally
+                                if cycle_count % 12 == 0:  # Every 60 seconds
+                                    self.show_recent_activity()
                         
                         # Process has exited
                         exit_code = process.returncode
@@ -755,10 +770,28 @@ while True:
             if log_files:
                 latest_log = max(log_files, key=lambda x: x.stat().st_mtime)
                 with open(latest_log, 'r', encoding='ascii', errors='replace') as f:
-                    lines = f.readlines()[-5:]  # Last 5 lines
-                    for line in lines:
-                        if line.strip():
-                            print(f"[LOG] {line.strip()}")
+                    lines = f.readlines()
+                    
+                    # Get only very recent lines (last 3) and filter out repetitive content
+                    recent_lines = lines[-3:] if len(lines) >= 3 else lines
+                    
+                    # Track what we've shown to avoid repeats
+                    if not hasattr(self, '_last_shown_lines'):
+                        self._last_shown_lines = set()
+                    
+                    for line in recent_lines:
+                        line_content = line.strip()
+                        if (line_content and 
+                            line_content not in self._last_shown_lines and
+                            not line_content.endswith("Starting Intraday Trading Engine in LIVE mode") and
+                            not line_content.endswith("Intraday trading engine stopped")):
+                            print(f"[LOG] {line_content}")
+                            self._last_shown_lines.add(line_content)
+                    
+                    # Keep only recent entries in memory
+                    if len(self._last_shown_lines) > 10:
+                        self._last_shown_lines.clear()
+                        
         except:
             pass  # Ignore errors in log reading
     

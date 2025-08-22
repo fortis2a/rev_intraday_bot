@@ -318,12 +318,17 @@ class IntradayEngine:
         """Scan watchlist for trading signals"""
         signals = []
         
-        for symbol in config['INTRADAY_WATCHLIST']:
+        # Enhanced debug logging for watchlist processing
+        self.logger.info(f"🔍 SIGNAL SCAN: Starting scan of {len(config['INTRADAY_WATCHLIST'])} symbols: {config['INTRADAY_WATCHLIST']}")
+        
+        for i, symbol in enumerate(config['INTRADAY_WATCHLIST']):
             try:
+                self.logger.info(f"📊 PROCESSING [{i+1}/{len(config['INTRADAY_WATCHLIST'])}]: {symbol}")
+                
                 # Get market data
                 df = self.data_manager.get_bars(symbol, config['TIMEFRAME'])
                 if df.empty or len(df) < 26:  # Enhanced minimum for MACD calculation
-                    self.logger.debug(f"[DEBUG] Insufficient data for {symbol}: {len(df) if not df.empty else 0} bars")
+                    self.logger.info(f"⚠️ SKIP {symbol}: Insufficient data ({len(df) if not df.empty else 0} bars)")
                     continue
                 
                 # Calculate enhanced indicators
@@ -332,9 +337,13 @@ class IntradayEngine:
                 # Check current price limits
                 current_price = df.iloc[-1]['close']
                 if current_price < config['MIN_PRICE'] or current_price > config['MAX_PRICE']:
+                    self.logger.info(f"⚠️ SKIP {symbol}: Price ${current_price:.2f} outside range [${config['MIN_PRICE']}, ${config['MAX_PRICE']}]")
                     continue
                 
+                self.logger.info(f"✅ DATA OK {symbol}: {len(df)} bars, price ${current_price:.2f}")
+                
                 # Run each enhanced strategy
+                strategy_signals_count = 0
                 for strategy_name, strategy_class in self.strategy_classes.items():
                     try:
                         # Create strategy instance for this symbol - ALL strategies need symbol
@@ -345,15 +354,22 @@ class IntradayEngine:
                             # Add strategy signal to list for processing
                             # We'll check enhanced confidence later during execution
                             signals.append(signal)
-                            self.logger.info(f"[STRATEGY SIGNAL] {strategy_name}: {signal['action']} {symbol} - {signal['reason']}")
+                            strategy_signals_count += 1
+                            self.logger.info(f"🎯 SIGNAL GENERATED [{strategy_name}]: {signal['action']} {symbol} - {signal['reason']}")
                     except Exception as strategy_error:
-                        self.logger.error(f"[ERROR] Strategy {strategy_name} failed for {symbol}: {strategy_error}")
+                        self.logger.error(f"❌ STRATEGY ERROR [{strategy_name}] for {symbol}: {strategy_error}")
                         continue
                 
+                if strategy_signals_count == 0:
+                    self.logger.info(f"📈 NO SIGNALS: {symbol} - no strategies triggered")
+                else:
+                    self.logger.info(f"🚀 SIGNALS FOUND: {symbol} generated {strategy_signals_count} signals")
+                
             except Exception as e:
-                self.logger.error(f"[ERROR] Failed to scan {symbol}: {e}")
+                self.logger.error(f"❌ SCAN ERROR for {symbol}: {e}")
                 continue
         
+        self.logger.info(f"📋 SCAN COMPLETE: Found {len(signals)} total signals from {len(config['INTRADAY_WATCHLIST'])} symbols")
         return signals
     
     def execute_signal(self, signal):
@@ -400,7 +416,11 @@ class IntradayEngine:
                     order_result = self.order_manager.place_buy_order(symbol, signal)
                     if order_result:
                         self.trade_count += 1
-                        self.active_positions[symbol] = order_result
+                        self.active_positions[symbol] = {
+                            'order_result': order_result,
+                            'timestamp': datetime.now(),
+                            'entry_price': order_result.get('entry_price') if isinstance(order_result, dict) else None
+                        }
                         
                         # Enhanced logging for watched stocks
                         if was_watched:
@@ -415,6 +435,13 @@ class IntradayEngine:
                 # Check if we have an existing position
                 if existing_position:
                     if existing_position['side'] == 'long':
+                        # Check if we just opened this position recently (avoid immediate reversals)
+                        if symbol in self.active_positions:
+                            position_age = (datetime.now() - self.active_positions[symbol].get('timestamp', datetime.now())).total_seconds()
+                            if position_age < 60:  # Less than 1 minute old
+                                self.logger.info(f"[SKIP] {symbol} position too new ({position_age:.0f}s) - avoiding immediate reversal")
+                                return False
+                        
                         # Sell long position
                         order_result = self.order_manager.place_sell_order(symbol)
                         if order_result:

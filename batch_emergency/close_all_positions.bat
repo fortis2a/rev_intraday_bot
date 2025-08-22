@@ -8,8 +8,8 @@ echo.
 echo This will close ALL open positions!
 echo.
 
-cd /d "%~dp0"
-".venv\Scripts\python.exe" emergency_close_all.py
+cd /d "%~dp0\.."
+".venv\Scripts\python.exe" emergency\emergency_close_all.py
 
 echo.
 pause

@@ -335,3 +335,51 @@ class TrailingStopManager:
                 
         except Exception as e:
             self.logger.error(f"❌ Failed to log position summary: {e}")
+
+    def sync_with_account_positions(self, data_manager):
+        """Synchronize trailing stop positions with actual account positions"""
+        try:
+            # Get actual account positions
+            account_positions = data_manager.get_positions()
+            current_symbols = set()
+            
+            for pos in account_positions:
+                if float(pos['qty']) != 0:
+                    symbol = pos['symbol']
+                    current_symbols.add(symbol)
+                    
+                    # If position not tracked, add it
+                    if symbol not in self.active_positions:
+                        self.logger.warning(f"[SYNC] {symbol} position found but not tracked - adding to TSM")
+                        
+                        # Get stock-specific thresholds
+                        try:
+                            from stock_specific_config import get_stock_thresholds
+                            thresholds = get_stock_thresholds(symbol)
+                        except:
+                            thresholds = None
+                        
+                        entry_price = float(pos['avg_entry_price'])
+                        quantity = abs(int(pos['qty']))
+                        side = 'long' if float(pos['qty']) > 0 else 'short'
+                        
+                        self.add_position(
+                            symbol=symbol,
+                            entry_price=entry_price,
+                            quantity=quantity,
+                            side=side,
+                            custom_thresholds=thresholds
+                        )
+            
+            # Remove positions that no longer exist in account
+            tracked_symbols = set(self.active_positions.keys())
+            for symbol in tracked_symbols:
+                if symbol not in current_symbols:
+                    self.logger.warning(f"[SYNC] {symbol} no longer in account - removing from TSM")
+                    self.remove_position(symbol, "Position closed externally")
+            
+            if self.active_positions:
+                self.logger.info(f"[SYNC] ✅ Synchronized {len(self.active_positions)} positions with account")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to sync with account positions: {e}")

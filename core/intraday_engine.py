@@ -2032,16 +2032,19 @@ class IntradayEngine:
             symbols = self.filter_watchlist()
             # store for diagnostics
             self.last_filtered_symbols = symbols
-            self.logger.info(f"📋 Processing {len(symbols)} filtered symbols: {symbols}")
+            self.logger.info(f"📋 WATCHLIST DEBUG: Original {len(config.INTRADAY_WATCHLIST)} symbols: {config.INTRADAY_WATCHLIST}")
+            self.logger.info(f"📋 FILTERED RESULT: {len(symbols)} symbols passed filters: {symbols}")
+            if hasattr(self, 'last_filter_rejections') and self.last_filter_rejections:
+                self.logger.info(f"🚫 FILTER REJECTIONS: {self.last_filter_rejections}")
             
             # Process each symbol
             for symbol in symbols:
                 try:
-                    self.logger.info(f"🔍 Processing {symbol}...")
+                    self.logger.info(f"🔍 SYMBOL PROCESSING: {symbol} - Starting analysis...")
                     
                     # Skip if we already have a position in this symbol
                     if symbol in self.active_positions:
-                        self.logger.info(f"⏭️ Skipping {symbol} - already have position")
+                        self.logger.info(f"⏭️ SKIP REASON: {symbol} - already have position in active_positions")
                         continue
                     
                     # Double-check: verify no actual broker position exists
