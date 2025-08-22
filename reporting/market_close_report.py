@@ -278,46 +278,48 @@ class MarketCloseReportGenerator:
         }
 
     def _analyze_symbol_performance(self, df):
-        """Analyze performance by symbol using REALIZED P&L data"""
+        """Analyze performance by symbol using ROUND-TRIP P&L to match Alpaca methodology"""
         symbol_stats = {}
         
         for symbol in df['symbol'].unique():
             symbol_trades = df[df['symbol'] == symbol]
             
-            # Calculate realized P&L for this symbol using FIFO matching
+            # Calculate ROUND-TRIP P&L for this symbol (matches Alpaca method)
             symbol_trades_sorted = symbol_trades.sort_values('filled_at')
             buys = symbol_trades_sorted[symbol_trades_sorted['side'] == 'buy'].copy()
             sells = symbol_trades_sorted[symbol_trades_sorted['side'].isin(['sell', 'sell_short'])].copy()
             
-            # FIFO matching for realized P&L calculation
-            buy_queue = buys.to_dict('records')
+            # Only calculate P&L for symbols with BOTH buys and sells (round trips)
             symbol_realized_pnl = 0
-            
-            for _, sell_row in sells.iterrows():
-                sell_qty_remaining = sell_row['qty']
-                sell_price = sell_row['price']
+            if len(buys) > 0 and len(sells) > 0:
+                # FIFO matching for round-trip P&L calculation (Alpaca method)
+                buy_queue = buys.to_dict('records')
                 
-                while sell_qty_remaining > 0 and buy_queue:
-                    buy = buy_queue[0]
-                    buy_price = buy['price']
+                for _, sell_row in sells.iterrows():
+                    sell_qty_remaining = sell_row['qty']
+                    sell_price = sell_row['price']
                     
-                    if buy['qty'] <= sell_qty_remaining:
-                        # Full buy order matched
-                        matched_qty = buy['qty']
-                        realized_pnl = matched_qty * (sell_price - buy_price)
-                        symbol_realized_pnl += realized_pnl
+                    while sell_qty_remaining > 0 and buy_queue:
+                        buy = buy_queue[0]
+                        buy_price = buy['price']
                         
-                        sell_qty_remaining -= matched_qty
-                        buy_queue.pop(0)  # Remove fully matched buy
-                    else:
-                        # Partial buy order matched
-                        matched_qty = sell_qty_remaining
-                        realized_pnl = matched_qty * (sell_price - buy_price)
-                        symbol_realized_pnl += realized_pnl
-                        
-                        buy['qty'] -= matched_qty  # Reduce buy quantity
-                        sell_qty_remaining = 0
-            
+                        if buy['qty'] <= sell_qty_remaining:
+                            # Full buy order matched
+                            matched_qty = buy['qty']
+                            realized_pnl = matched_qty * (sell_price - buy_price)
+                            symbol_realized_pnl += realized_pnl
+                            
+                            sell_qty_remaining -= matched_qty
+                            buy_queue.pop(0)  # Remove fully matched buy
+                        else:
+                            # Partial buy order matched
+                            matched_qty = sell_qty_remaining
+                            realized_pnl = matched_qty * (sell_price - buy_price)
+                            symbol_realized_pnl += realized_pnl
+                            
+                            buy['qty'] -= matched_qty  # Reduce buy quantity
+                            sell_qty_remaining = 0
+
             total_volume = symbol_trades['value'].sum()
             
             # Count different types of activities
@@ -328,13 +330,13 @@ class MarketCloseReportGenerator:
             trade_times = symbol_trades['hour'].tolist()
             avg_trade_time = np.mean(trade_times) if trade_times else 0
             
-            # Calculate percentage return based on realized P&L
+            # Calculate percentage return based on round-trip P&L
             pnl_pct = (symbol_realized_pnl / total_volume * 100) if total_volume > 0 else 0
             
             symbol_stats[symbol] = {
                 'total_trades': len(symbol_trades),
                 'total_volume': total_volume,
-                'pnl': symbol_realized_pnl,  # Use realized P&L
+                'pnl': symbol_realized_pnl,  # Use round-trip P&L to match Alpaca
                 'pnl_pct': pnl_pct,
                 'avg_trade_time': avg_trade_time,
                 'buys': len(buys),
@@ -1054,7 +1056,7 @@ class MarketCloseReportGenerator:
         }
 
     def _get_trade_summary_with_combined_data(self, df_combined, today_date):
-        """Get trade summary using TODAY-ONLY activities for accurate P&L matching with Alpaca"""
+        """Get trade summary using ROUND-TRIP P&L to match Alpaca's methodology exactly"""
         if df_combined.empty:
             return {}
         
@@ -1064,51 +1066,49 @@ class MarketCloseReportGenerator:
         if today_activities.empty:
             return {}
         
-        # Calculate realized P&L using TODAY-ONLY activities (FIFO matching)
+        # Calculate ROUND-TRIP P&L using TODAY-ONLY activities (matches Alpaca method)
         total_realized_pnl = 0
         
-        # Group by symbol and side for today's activities
-        buys_today = {}
-        sells_today = {}
-        
-        for _, activity in today_activities.iterrows():
-            symbol = activity['symbol']
-            side = activity['side']
-            qty = float(activity['qty'])
-            price = float(activity['price'])
+        # Group by symbol and calculate round-trip P&L (buy-sell pairs only)
+        for symbol in today_activities['symbol'].unique():
+            symbol_trades = today_activities[today_activities['symbol'] == symbol].sort_values('filled_at')
             
-            if side == 'buy':
-                if symbol not in buys_today:
-                    buys_today[symbol] = []
-                buys_today[symbol].append((qty, price))
-            else:  # sell or sell_short
-                if symbol not in sells_today:
-                    sells_today[symbol] = []
-                sells_today[symbol].append((qty, price))
-        
-        # Calculate P&L for symbols that have both buys and sells today
-        for symbol in sells_today:
-            if symbol in buys_today:
-                buy_queue = buys_today[symbol][:]
-                symbol_pnl = 0
+            # Separate buys and sells for round-trip matching
+            buys = symbol_trades[symbol_trades['side'] == 'buy'].copy()
+            sells = symbol_trades[symbol_trades['side'].isin(['sell', 'sell_short'])].copy()
+            
+            # Only calculate P&L for symbols with BOTH buys and sells today (round trips)
+            if len(buys) > 0 and len(sells) > 0:
+                # FIFO matching for round-trip P&L calculation (Alpaca method)
+                buy_queue = buys.to_dict('records')
+                symbol_realized_pnl = 0
                 
-                for sell_qty, sell_price in sells_today[symbol]:
-                    remaining_sell = sell_qty
+                for _, sell_row in sells.iterrows():
+                    sell_qty_remaining = sell_row['qty']
+                    sell_price = sell_row['price']
                     
-                    while remaining_sell > 0 and buy_queue:
-                        buy_qty, buy_price = buy_queue[0]
+                    while sell_qty_remaining > 0 and buy_queue:
+                        buy = buy_queue[0]
+                        buy_price = buy['price']
                         
-                        match_qty = min(remaining_sell, buy_qty)
-                        pnl = match_qty * (sell_price - buy_price)
-                        symbol_pnl += pnl
-                        
-                        remaining_sell -= match_qty
-                        buy_queue[0] = (buy_qty - match_qty, buy_price)
-                        
-                        if buy_queue[0][0] == 0:
-                            buy_queue.pop(0)
+                        if buy['qty'] <= sell_qty_remaining:
+                            # Full buy order matched
+                            matched_qty = buy['qty']
+                            realized_pnl = matched_qty * (sell_price - buy_price)
+                            symbol_realized_pnl += realized_pnl
+                            
+                            sell_qty_remaining -= matched_qty
+                            buy_queue.pop(0)  # Remove fully matched buy
+                        else:
+                            # Partial buy order matched
+                            matched_qty = sell_qty_remaining
+                            realized_pnl = matched_qty * (sell_price - buy_price)
+                            symbol_realized_pnl += realized_pnl
+                            
+                            buy['qty'] -= matched_qty  # Reduce buy quantity
+                            sell_qty_remaining = 0
                 
-                total_realized_pnl += symbol_pnl
+                total_realized_pnl += symbol_realized_pnl
 
         return {
             'total_trades': len(today_activities),
