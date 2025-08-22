@@ -23,6 +23,20 @@ data/positions_*.json
 *.pdf
 reports/
 
+# Debugging and investigation scripts (to prevent clutter)
+debug_*.py
+analyze_*.py
+investigate_*.py
+reconcile_*.py
+test_updated_*.py
+verify_*.py
+check_*.py
+final_*.py
+deep_dive_*.py
+*_investigation.py
+*_analysis.py
+*_debug.py
+
 # IDE (but keep current .vscode/settings.json)
 .idea/
 *.swp
