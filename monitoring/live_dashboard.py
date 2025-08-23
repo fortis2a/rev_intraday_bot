@@ -20,215 +20,281 @@ sys.path.insert(0, str(project_root))
 
 from database.trading_db import TradingDatabase
 
+
 class LiveDashboard:
     """Interactive Live Dashboard with Real-time Updates"""
-    
+
     def __init__(self):
         self.db = TradingDatabase()
         self.report_dir = Path("reports")
         self.report_dir.mkdir(exist_ok=True)
-        
+
         # Setup logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-    
+
     def generate_live_dashboard(self, target_date: date = None) -> str:
         """Generate interactive live dashboard"""
         if target_date is None:
             target_date = date.today()
-        
+
         self.logger.info(f"Generating live dashboard for {target_date}")
-        
+
         # Get comprehensive data
         dashboard_data = self._collect_dashboard_data(target_date)
-        
+
         # Generate interactive HTML
         html_content = self._generate_interactive_html(target_date, dashboard_data)
-        
+
         # Save dashboard
-        dashboard_file = self.report_dir / f"live_dashboard_{target_date.strftime('%Y%m%d')}.html"
-        with open(dashboard_file, 'w', encoding='utf-8') as f:
+        dashboard_file = (
+            self.report_dir / f"live_dashboard_{target_date.strftime('%Y%m%d')}.html"
+        )
+        with open(dashboard_file, "w", encoding="utf-8") as f:
             f.write(html_content)
-        
+
         self.logger.info(f"Live dashboard saved to: {dashboard_file}")
         return str(dashboard_file)
-    
+
     def _collect_dashboard_data(self, target_date: date) -> Dict[str, Any]:
         """Collect comprehensive data for dashboard"""
-        
+
         # Current day data
         today_summary = self.db.get_daily_summary(target_date)
         today_activities = self.db.get_activities(target_date)
-        
+
         # Historical data (last 7 days)
         end_date = target_date
         start_date = end_date - timedelta(days=7)
         historical_summaries = self.db.get_date_range_summaries(start_date, end_date)
-        
+
         # Enhanced calendar and trend analysis
-        calendar_analysis = self._generate_calendar_analysis(historical_summaries, target_date)
-        
+        calendar_analysis = self._generate_calendar_analysis(
+            historical_summaries, target_date
+        )
+
         # Performance metrics
         performance_metrics = self._calculate_performance_metrics(historical_summaries)
-        
+
         # Enhanced performance metrics with day-by-day details
-        enhanced_performance = self._calculate_enhanced_performance_metrics(historical_summaries, target_date)
-        
+        enhanced_performance = self._calculate_enhanced_performance_metrics(
+            historical_summaries, target_date
+        )
+
         # Symbol analysis (now with P&L focus)
-        symbol_analysis = self._analyze_symbol_performance_with_pnl(today_activities, today_summary, historical_summaries)
-        
+        symbol_analysis = self._analyze_symbol_performance_with_pnl(
+            today_activities, today_summary, historical_summaries
+        )
+
         # Trading patterns (enhanced with P&L analysis)
-        trading_patterns = self._analyze_trading_patterns_with_pnl(today_activities, today_summary)
-        
+        trading_patterns = self._analyze_trading_patterns_with_pnl(
+            today_activities, today_summary
+        )
+
         # Risk metrics
         risk_metrics = self._calculate_risk_metrics(historical_summaries)
-        
+
         return {
-            'today_summary': today_summary,
-            'today_activities': today_activities,
-            'historical_summaries': historical_summaries,
-            'calendar_analysis': calendar_analysis,
-            'performance_metrics': performance_metrics,
-            'enhanced_performance': enhanced_performance,
-            'symbol_analysis': symbol_analysis,
-            'trading_patterns': trading_patterns,
-            'risk_metrics': risk_metrics,
-            'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            "today_summary": today_summary,
+            "today_activities": today_activities,
+            "historical_summaries": historical_summaries,
+            "calendar_analysis": calendar_analysis,
+            "performance_metrics": performance_metrics,
+            "enhanced_performance": enhanced_performance,
+            "symbol_analysis": symbol_analysis,
+            "trading_patterns": trading_patterns,
+            "risk_metrics": risk_metrics,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-    
-    def _calculate_performance_metrics(self, historical_data: pd.DataFrame) -> Dict[str, Any]:
+
+    def _calculate_performance_metrics(
+        self, historical_data: pd.DataFrame
+    ) -> Dict[str, Any]:
         """Calculate advanced performance metrics"""
         if historical_data.empty:
             return {}
-        
+
         # Calculate metrics using alpaca_pnl when available, fallback to cash_flow_pnl
-        pnl_series = historical_data['alpaca_pnl'].fillna(historical_data['cash_flow_pnl'])
-        
+        pnl_series = historical_data["alpaca_pnl"].fillna(
+            historical_data["cash_flow_pnl"]
+        )
+
         return {
-            'total_pnl': pnl_series.sum(),
-            'avg_daily_pnl': pnl_series.mean(),
-            'best_day': pnl_series.max(),
-            'worst_day': pnl_series.min(),
-            'win_rate': (pnl_series > 0).sum() / len(pnl_series) * 100,
-            'total_trades': historical_data['total_trades'].sum(),
-            'avg_trades_per_day': historical_data['total_trades'].mean(),
-            'total_volume': historical_data['total_volume'].sum(),
-            'sharpe_ratio': pnl_series.mean() / pnl_series.std() if pnl_series.std() > 0 else 0,
-            'max_drawdown': self._calculate_max_drawdown(pnl_series.cumsum()),
-            'consecutive_wins': self._calculate_consecutive_wins(pnl_series),
-            'consecutive_losses': self._calculate_consecutive_losses(pnl_series)
+            "total_pnl": pnl_series.sum(),
+            "avg_daily_pnl": pnl_series.mean(),
+            "best_day": pnl_series.max(),
+            "worst_day": pnl_series.min(),
+            "win_rate": (pnl_series > 0).sum() / len(pnl_series) * 100,
+            "total_trades": historical_data["total_trades"].sum(),
+            "avg_trades_per_day": historical_data["total_trades"].mean(),
+            "total_volume": historical_data["total_volume"].sum(),
+            "sharpe_ratio": (
+                pnl_series.mean() / pnl_series.std() if pnl_series.std() > 0 else 0
+            ),
+            "max_drawdown": self._calculate_max_drawdown(pnl_series.cumsum()),
+            "consecutive_wins": self._calculate_consecutive_wins(pnl_series),
+            "consecutive_losses": self._calculate_consecutive_losses(pnl_series),
         }
-    
-    def _generate_calendar_analysis(self, historical_data: pd.DataFrame, target_date: date) -> Dict[str, Any]:
+
+    def _generate_calendar_analysis(
+        self, historical_data: pd.DataFrame, target_date: date
+    ) -> Dict[str, Any]:
         """Generate comprehensive calendar analysis with daily details"""
         if historical_data.empty:
             return {}
-        
+
         # Sort by date
-        historical_data = historical_data.sort_values('trade_date')
-        
+        historical_data = historical_data.sort_values("trade_date")
+
         # Get previous day for comparison
         yesterday = target_date - timedelta(days=1)
         while yesterday.weekday() >= 5:  # Skip weekends
             yesterday -= timedelta(days=1)
-        
-        today_data = historical_data[historical_data['trade_date'] == target_date.strftime('%Y-%m-%d')]
-        yesterday_data = historical_data[historical_data['trade_date'] == yesterday.strftime('%Y-%m-%d')]
-        
+
+        today_data = historical_data[
+            historical_data["trade_date"] == target_date.strftime("%Y-%m-%d")
+        ]
+        yesterday_data = historical_data[
+            historical_data["trade_date"] == yesterday.strftime("%Y-%m-%d")
+        ]
+
         # Build calendar data with enhanced metrics
         calendar_days = []
         for _, row in historical_data.iterrows():
-            day_date = pd.to_datetime(row['trade_date']).date()
-            pnl = row['alpaca_pnl'] if pd.notna(row['alpaca_pnl']) else row['cash_flow_pnl']
-            
+            day_date = pd.to_datetime(row["trade_date"]).date()
+            pnl = (
+                row["alpaca_pnl"]
+                if pd.notna(row["alpaca_pnl"])
+                else row["cash_flow_pnl"]
+            )
+
             # Calculate day-specific performance metrics (simplified since we don't have win/loss breakdown in daily_summaries)
-            day_avg_trade = pnl / row['total_trades'] if row['total_trades'] > 0 else 0
-            
+            day_avg_trade = pnl / row["total_trades"] if row["total_trades"] > 0 else 0
+
             # Estimate win rate based on P&L and trading activity (simplified)
             # This is an approximation - for exact win rate, we'd need access to individual trade records
             estimated_win_rate = 50.0 if pnl == 0 else (60.0 if pnl > 0 else 40.0)
-            
-            calendar_days.append({
-                'date': day_date.strftime('%Y-%m-%d'),
-                'day_name': day_date.strftime('%A'),
-                'day_short': day_date.strftime('%a'),
-                'day_num': day_date.day,
-                'pnl': pnl,
-                'trades': row['total_trades'],
-                'symbols': row['unique_symbols'],
-                'volume': row['total_volume'],
-                'win_rate': estimated_win_rate,
-                'avg_trade': day_avg_trade,
-                'is_today': day_date == target_date,
-                'is_yesterday': day_date == yesterday,
-                'performance_class': 'positive' if pnl > 0 else 'negative' if pnl < 0 else 'neutral'
-            })
-        
+
+            calendar_days.append(
+                {
+                    "date": day_date.strftime("%Y-%m-%d"),
+                    "day_name": day_date.strftime("%A"),
+                    "day_short": day_date.strftime("%a"),
+                    "day_num": day_date.day,
+                    "pnl": pnl,
+                    "trades": row["total_trades"],
+                    "symbols": row["unique_symbols"],
+                    "volume": row["total_volume"],
+                    "win_rate": estimated_win_rate,
+                    "avg_trade": day_avg_trade,
+                    "is_today": day_date == target_date,
+                    "is_yesterday": day_date == yesterday,
+                    "performance_class": (
+                        "positive" if pnl > 0 else "negative" if pnl < 0 else "neutral"
+                    ),
+                }
+            )
+
         # Calculate trends and comparisons
-        today_pnl = today_data['alpaca_pnl'].iloc[0] if not today_data.empty and pd.notna(today_data['alpaca_pnl'].iloc[0]) else (today_data['cash_flow_pnl'].iloc[0] if not today_data.empty else 0)
-        yesterday_pnl = yesterday_data['alpaca_pnl'].iloc[0] if not yesterday_data.empty and pd.notna(yesterday_data['alpaca_pnl'].iloc[0]) else (yesterday_data['cash_flow_pnl'].iloc[0] if not yesterday_data.empty else 0)
-        
+        today_pnl = (
+            today_data["alpaca_pnl"].iloc[0]
+            if not today_data.empty and pd.notna(today_data["alpaca_pnl"].iloc[0])
+            else (today_data["cash_flow_pnl"].iloc[0] if not today_data.empty else 0)
+        )
+        yesterday_pnl = (
+            yesterday_data["alpaca_pnl"].iloc[0]
+            if not yesterday_data.empty
+            and pd.notna(yesterday_data["alpaca_pnl"].iloc[0])
+            else (
+                yesterday_data["cash_flow_pnl"].iloc[0]
+                if not yesterday_data.empty
+                else 0
+            )
+        )
+
         day_over_day_change = today_pnl - yesterday_pnl
-        day_over_day_pct = (day_over_day_change / abs(yesterday_pnl)) * 100 if yesterday_pnl != 0 else 0
-        
+        day_over_day_pct = (
+            (day_over_day_change / abs(yesterday_pnl)) * 100
+            if yesterday_pnl != 0
+            else 0
+        )
+
         # Weekly aggregated metrics
-        weekly_trades = historical_data['total_trades'].sum()
-        weekly_volume = historical_data['total_volume'].sum()
-        total_pnl = sum(historical_data['alpaca_pnl'].fillna(historical_data['cash_flow_pnl']))
+        weekly_trades = historical_data["total_trades"].sum()
+        weekly_volume = historical_data["total_volume"].sum()
+        total_pnl = sum(
+            historical_data["alpaca_pnl"].fillna(historical_data["cash_flow_pnl"])
+        )
         weekly_avg_trade = total_pnl / weekly_trades if weekly_trades > 0 else 0
-        
+
         # Estimate weekly win rate based on profitable days
-        profitable_days = len([d for d in calendar_days if d['pnl'] > 0])
-        weekly_win_rate = (profitable_days / len(calendar_days)) * 100 if calendar_days else 0
-        
+        profitable_days = len([d for d in calendar_days if d["pnl"] > 0])
+        weekly_win_rate = (
+            (profitable_days / len(calendar_days)) * 100 if calendar_days else 0
+        )
+
         return {
-            'calendar_days': calendar_days,
-            'today_date': target_date.strftime('%Y-%m-%d'),
-            'yesterday_date': yesterday.strftime('%Y-%m-%d'),
-            'today_pnl': today_pnl,
-            'yesterday_pnl': yesterday_pnl,
-            'day_over_day_change': day_over_day_change,
-            'day_over_day_pct': day_over_day_pct,
-            'trading_days': len(calendar_days),
-            'profitable_days': profitable_days,
-            'losing_days': len([d for d in calendar_days if d['pnl'] < 0]),
-            'weekly_metrics': {
-                'total_trades': weekly_trades,
-                'total_volume': weekly_volume,
-                'win_rate': weekly_win_rate,
-                'avg_trade': weekly_avg_trade,
-                'total_pnl': total_pnl
-            }
+            "calendar_days": calendar_days,
+            "today_date": target_date.strftime("%Y-%m-%d"),
+            "yesterday_date": yesterday.strftime("%Y-%m-%d"),
+            "today_pnl": today_pnl,
+            "yesterday_pnl": yesterday_pnl,
+            "day_over_day_change": day_over_day_change,
+            "day_over_day_pct": day_over_day_pct,
+            "trading_days": len(calendar_days),
+            "profitable_days": profitable_days,
+            "losing_days": len([d for d in calendar_days if d["pnl"] < 0]),
+            "weekly_metrics": {
+                "total_trades": weekly_trades,
+                "total_volume": weekly_volume,
+                "win_rate": weekly_win_rate,
+                "avg_trade": weekly_avg_trade,
+                "total_pnl": total_pnl,
+            },
         }
-    
-    def _calculate_enhanced_performance_metrics(self, historical_data: pd.DataFrame, target_date: date) -> Dict[str, Any]:
+
+    def _calculate_enhanced_performance_metrics(
+        self, historical_data: pd.DataFrame, target_date: date
+    ) -> Dict[str, Any]:
         """Calculate enhanced performance metrics with detailed breakdowns"""
         if historical_data.empty:
             return {}
-        
+
         # Sort by date for trend analysis
-        historical_data = historical_data.sort_values('trade_date')
-        pnl_series = historical_data['alpaca_pnl'].fillna(historical_data['cash_flow_pnl'])
-        
+        historical_data = historical_data.sort_values("trade_date")
+        pnl_series = historical_data["alpaca_pnl"].fillna(
+            historical_data["cash_flow_pnl"]
+        )
+
         # Week-by-week analysis
         week_start = target_date - timedelta(days=6)
-        current_week_data = historical_data[historical_data['trade_date'] >= week_start.strftime('%Y-%m-%d')]
-        
+        current_week_data = historical_data[
+            historical_data["trade_date"] >= week_start.strftime("%Y-%m-%d")
+        ]
+
         # Daily performance ranking
         daily_performance = []
         for _, row in historical_data.iterrows():
-            pnl = row['alpaca_pnl'] if pd.notna(row['alpaca_pnl']) else row['cash_flow_pnl']
-            daily_performance.append({
-                'date': row['trade_date'],
-                'pnl': pnl,
-                'trades': row['total_trades'],
-                'volume': row['total_volume'],
-                'efficiency': pnl / row['total_trades'] if row['total_trades'] > 0 else 0
-            })
-        
+            pnl = (
+                row["alpaca_pnl"]
+                if pd.notna(row["alpaca_pnl"])
+                else row["cash_flow_pnl"]
+            )
+            daily_performance.append(
+                {
+                    "date": row["trade_date"],
+                    "pnl": pnl,
+                    "trades": row["total_trades"],
+                    "volume": row["total_volume"],
+                    "efficiency": (
+                        pnl / row["total_trades"] if row["total_trades"] > 0 else 0
+                    ),
+                }
+            )
+
         # Sort by performance
-        daily_performance.sort(key=lambda x: x['pnl'], reverse=True)
-        
+        daily_performance.sort(key=lambda x: x["pnl"], reverse=True)
+
         # Calculate momentum (last 3 days vs first 3 days)
         if len(pnl_series) >= 3:
             recent_avg = pnl_series.tail(3).mean()
@@ -236,270 +302,329 @@ class LiveDashboard:
             momentum = recent_avg - early_avg
         else:
             momentum = 0
-        
+
         return {
-            'daily_performance_ranking': daily_performance,
-            'best_day': daily_performance[0] if daily_performance else None,
-            'worst_day': daily_performance[-1] if daily_performance else None,
-            'current_week_pnl': current_week_data['alpaca_pnl'].fillna(current_week_data['cash_flow_pnl']).sum(),
-            'current_week_trades': current_week_data['total_trades'].sum(),
-            'momentum': momentum,
-            'momentum_direction': 'improving' if momentum > 0 else 'declining' if momentum < 0 else 'stable',
-            'avg_daily_pnl': pnl_series.mean(),
-            'pnl_volatility': pnl_series.std(),
-            'consistency_score': (pnl_series > 0).sum() / len(pnl_series) * 100
+            "daily_performance_ranking": daily_performance,
+            "best_day": daily_performance[0] if daily_performance else None,
+            "worst_day": daily_performance[-1] if daily_performance else None,
+            "current_week_pnl": current_week_data["alpaca_pnl"]
+            .fillna(current_week_data["cash_flow_pnl"])
+            .sum(),
+            "current_week_trades": current_week_data["total_trades"].sum(),
+            "momentum": momentum,
+            "momentum_direction": (
+                "improving"
+                if momentum > 0
+                else "declining" if momentum < 0 else "stable"
+            ),
+            "avg_daily_pnl": pnl_series.mean(),
+            "pnl_volatility": pnl_series.std(),
+            "consistency_score": (pnl_series > 0).sum() / len(pnl_series) * 100,
         }
-    
-    def _analyze_symbol_performance(self, today_activities: pd.DataFrame, historical_data: pd.DataFrame) -> Dict[str, Any]:
+
+    def _analyze_symbol_performance(
+        self, today_activities: pd.DataFrame, historical_data: pd.DataFrame
+    ) -> Dict[str, Any]:
         """Analyze performance by symbol"""
         symbol_stats = {}
-        
+
         if not today_activities.empty:
             # Today's symbol performance
-            for symbol in today_activities['symbol'].unique():
-                symbol_trades = today_activities[today_activities['symbol'] == symbol]
-                
+            for symbol in today_activities["symbol"].unique():
+                symbol_trades = today_activities[today_activities["symbol"] == symbol]
+
                 # Calculate P&L for symbol
-                side_totals = symbol_trades.groupby('side')['value'].sum()
-                sells = side_totals.get('sell', 0) + side_totals.get('sell_short', 0)
-                buys = side_totals.get('buy', 0)
+                side_totals = symbol_trades.groupby("side")["value"].sum()
+                sells = side_totals.get("sell", 0) + side_totals.get("sell_short", 0)
+                buys = side_totals.get("buy", 0)
                 symbol_pnl = sells - buys
-                
+
                 symbol_stats[symbol] = {
-                    'trades_today': len(symbol_trades),
-                    'volume_today': symbol_trades['value'].sum(),
-                    'pnl_today': symbol_pnl,
-                    'avg_price': symbol_trades['price'].mean(),
-                    'price_range': {
-                        'min': symbol_trades['price'].min(),
-                        'max': symbol_trades['price'].max()
-                    }
+                    "trades_today": len(symbol_trades),
+                    "volume_today": symbol_trades["value"].sum(),
+                    "pnl_today": symbol_pnl,
+                    "avg_price": symbol_trades["price"].mean(),
+                    "price_range": {
+                        "min": symbol_trades["price"].min(),
+                        "max": symbol_trades["price"].max(),
+                    },
                 }
-        
+
         return symbol_stats
-    
-    def _analyze_symbol_performance_with_pnl(self, today_activities: pd.DataFrame, today_summary: dict, historical_data: pd.DataFrame) -> Dict[str, Any]:
+
+    def _analyze_symbol_performance_with_pnl(
+        self,
+        today_activities: pd.DataFrame,
+        today_summary: dict,
+        historical_data: pd.DataFrame,
+    ) -> Dict[str, Any]:
         """Analyze performance by symbol with actual P&L integration"""
         symbol_stats = {}
-        
+
         if not today_activities.empty:
             # Get today's actual P&L from summary
-            today_actual_pnl = today_summary.get('alpaca_pnl', today_summary.get('cash_flow_pnl', 0)) if today_summary else 0
-            
+            today_actual_pnl = (
+                today_summary.get("alpaca_pnl", today_summary.get("cash_flow_pnl", 0))
+                if today_summary
+                else 0
+            )
+
             # Calculate proportional P&L by symbol based on trading volume
-            total_volume = today_activities['value'].sum()
-            
-            for symbol in today_activities['symbol'].unique():
-                symbol_trades = today_activities[today_activities['symbol'] == symbol]
-                
+            total_volume = today_activities["value"].sum()
+
+            for symbol in today_activities["symbol"].unique():
+                symbol_trades = today_activities[today_activities["symbol"] == symbol]
+
                 # Calculate cash flow for comparison
-                side_totals = symbol_trades.groupby('side')['value'].sum()
-                sells = side_totals.get('sell', 0) + side_totals.get('sell_short', 0)
-                buys = side_totals.get('buy', 0)
+                side_totals = symbol_trades.groupby("side")["value"].sum()
+                sells = side_totals.get("sell", 0) + side_totals.get("sell_short", 0)
+                buys = side_totals.get("buy", 0)
                 symbol_cash_flow = sells - buys
-                
+
                 # Calculate symbol volume proportion
-                symbol_volume = symbol_trades['value'].sum()
-                volume_proportion = symbol_volume / total_volume if total_volume > 0 else 0
-                
+                symbol_volume = symbol_trades["value"].sum()
+                volume_proportion = (
+                    symbol_volume / total_volume if total_volume > 0 else 0
+                )
+
                 # Estimate symbol P&L based on proportion of total actual P&L
                 estimated_symbol_pnl = today_actual_pnl * volume_proportion
-                
+
                 symbol_stats[symbol] = {
-                    'trades_today': len(symbol_trades),
-                    'volume_today': symbol_volume,
-                    'cash_flow_pnl': symbol_cash_flow,
-                    'estimated_actual_pnl': estimated_symbol_pnl,
-                    'volume_proportion': volume_proportion,
-                    'avg_price': symbol_trades['price'].mean(),
-                    'price_range': {
-                        'min': symbol_trades['price'].min(),
-                        'max': symbol_trades['price'].max()
-                    }
+                    "trades_today": len(symbol_trades),
+                    "volume_today": symbol_volume,
+                    "cash_flow_pnl": symbol_cash_flow,
+                    "estimated_actual_pnl": estimated_symbol_pnl,
+                    "volume_proportion": volume_proportion,
+                    "avg_price": symbol_trades["price"].mean(),
+                    "price_range": {
+                        "min": symbol_trades["price"].min(),
+                        "max": symbol_trades["price"].max(),
+                    },
                 }
-        
+
         return symbol_stats
-    
-    def _analyze_trading_patterns_with_pnl(self, activities: pd.DataFrame, today_summary: dict) -> Dict[str, Any]:
+
+    def _analyze_trading_patterns_with_pnl(
+        self, activities: pd.DataFrame, today_summary: dict
+    ) -> Dict[str, Any]:
         """Analyze trading time patterns with actual P&L integration"""
         if activities.empty:
             return {}
-        
+
         # Convert transaction_time to hour
-        if 'transaction_time' not in activities.columns:
+        if "transaction_time" not in activities.columns:
             return {}
-        
-        activities['hour'] = pd.to_datetime(activities['transaction_time']).dt.hour
-        
+
+        activities["hour"] = pd.to_datetime(activities["transaction_time"]).dt.hour
+
         # Get today's actual P&L
-        today_actual_pnl = today_summary.get('alpaca_pnl', today_summary.get('cash_flow_pnl', 0)) if today_summary else 0
-        total_volume = activities['value'].sum()
-        
-        hourly_trades = activities.groupby('hour').size()
-        hourly_volume = activities.groupby('hour')['value'].sum()
-        
+        today_actual_pnl = (
+            today_summary.get("alpaca_pnl", today_summary.get("cash_flow_pnl", 0))
+            if today_summary
+            else 0
+        )
+        total_volume = activities["value"].sum()
+
+        hourly_trades = activities.groupby("hour").size()
+        hourly_volume = activities.groupby("hour")["value"].sum()
+
         # Calculate hourly P&L estimates based on volume proportion and actual P&L
         hourly_pnl_estimates = {}
         hourly_cash_flow = {}
-        
-        for hour in activities['hour'].unique():
-            hour_trades = activities[activities['hour'] == hour]
-            hour_volume = hour_trades['value'].sum()
+
+        for hour in activities["hour"].unique():
+            hour_trades = activities[activities["hour"] == hour]
+            hour_volume = hour_trades["value"].sum()
             volume_proportion = hour_volume / total_volume if total_volume > 0 else 0
-            
+
             # Estimated actual P&L for this hour
             estimated_hour_pnl = today_actual_pnl * volume_proportion
-            
+
             # Cash flow for comparison
-            side_totals = hour_trades.groupby('side')['value'].sum()
-            sells = side_totals.get('sell', 0) + side_totals.get('sell_short', 0)
-            buys = side_totals.get('buy', 0)
+            side_totals = hour_trades.groupby("side")["value"].sum()
+            sells = side_totals.get("sell", 0) + side_totals.get("sell_short", 0)
+            buys = side_totals.get("buy", 0)
             hour_cash_flow = sells - buys
-            
+
             hourly_pnl_estimates[hour] = estimated_hour_pnl
             hourly_cash_flow[hour] = hour_cash_flow
-        
+
         # Find best/worst hours based on estimated actual P&L
-        best_hour = max(hourly_pnl_estimates.keys(), key=lambda h: hourly_pnl_estimates[h]) if hourly_pnl_estimates else None
-        worst_hour = min(hourly_pnl_estimates.keys(), key=lambda h: hourly_pnl_estimates[h]) if hourly_pnl_estimates else None
-        
+        best_hour = (
+            max(hourly_pnl_estimates.keys(), key=lambda h: hourly_pnl_estimates[h])
+            if hourly_pnl_estimates
+            else None
+        )
+        worst_hour = (
+            min(hourly_pnl_estimates.keys(), key=lambda h: hourly_pnl_estimates[h])
+            if hourly_pnl_estimates
+            else None
+        )
+
         return {
-            'peak_trading_hour': hourly_trades.idxmax() if not hourly_trades.empty else None,
-            'peak_volume_hour': hourly_volume.idxmax() if not hourly_volume.empty else None,
-            'trading_distribution': hourly_trades.to_dict(),
-            'volume_distribution': hourly_volume.to_dict(),
-            'hourly_pnl_estimates': hourly_pnl_estimates,
-            'hourly_cash_flow': hourly_cash_flow,
-            'best_pnl_hour': best_hour,
-            'worst_pnl_hour': worst_hour,
-            'buy_sell_ratio': self._calculate_buy_sell_ratio(activities),
-            'total_actual_pnl': today_actual_pnl,
-            'pnl_calculation_method': 'Alpaca P&L (includes fees & multi-day positions)'
+            "peak_trading_hour": (
+                hourly_trades.idxmax() if not hourly_trades.empty else None
+            ),
+            "peak_volume_hour": (
+                hourly_volume.idxmax() if not hourly_volume.empty else None
+            ),
+            "trading_distribution": hourly_trades.to_dict(),
+            "volume_distribution": hourly_volume.to_dict(),
+            "hourly_pnl_estimates": hourly_pnl_estimates,
+            "hourly_cash_flow": hourly_cash_flow,
+            "best_pnl_hour": best_hour,
+            "worst_pnl_hour": worst_hour,
+            "buy_sell_ratio": self._calculate_buy_sell_ratio(activities),
+            "total_actual_pnl": today_actual_pnl,
+            "pnl_calculation_method": "Alpaca P&L (includes fees & multi-day positions)",
         }
-    
+
     def _analyze_trading_patterns(self, activities: pd.DataFrame) -> Dict[str, Any]:
         """Analyze trading time patterns"""
         if activities.empty:
             return {}
-        
+
         # Convert transaction_time to hour
-        if 'transaction_time' not in activities.columns:
+        if "transaction_time" not in activities.columns:
             return {}
-        
-        activities['hour'] = pd.to_datetime(activities['transaction_time']).dt.hour
-        
-        hourly_trades = activities.groupby('hour').size()
-        hourly_volume = activities.groupby('hour')['value'].sum()
-        
+
+        activities["hour"] = pd.to_datetime(activities["transaction_time"]).dt.hour
+
+        hourly_trades = activities.groupby("hour").size()
+        hourly_volume = activities.groupby("hour")["value"].sum()
+
         return {
-            'peak_trading_hour': hourly_trades.idxmax() if not hourly_trades.empty else None,
-            'peak_volume_hour': hourly_volume.idxmax() if not hourly_volume.empty else None,
-            'trading_distribution': hourly_trades.to_dict(),
-            'volume_distribution': hourly_volume.to_dict(),
-            'buy_sell_ratio': self._calculate_buy_sell_ratio(activities)
+            "peak_trading_hour": (
+                hourly_trades.idxmax() if not hourly_trades.empty else None
+            ),
+            "peak_volume_hour": (
+                hourly_volume.idxmax() if not hourly_volume.empty else None
+            ),
+            "trading_distribution": hourly_trades.to_dict(),
+            "volume_distribution": hourly_volume.to_dict(),
+            "buy_sell_ratio": self._calculate_buy_sell_ratio(activities),
         }
-    
+
     def _calculate_risk_metrics(self, historical_data: pd.DataFrame) -> Dict[str, Any]:
         """Calculate risk metrics"""
         if historical_data.empty:
             return {}
-        
-        pnl_series = historical_data['alpaca_pnl'].fillna(historical_data['cash_flow_pnl'])
-        
+
+        pnl_series = historical_data["alpaca_pnl"].fillna(
+            historical_data["cash_flow_pnl"]
+        )
+
         return {
-            'volatility': pnl_series.std(),
-            'var_95': pnl_series.quantile(0.05),  # Value at Risk 95%
-            'downside_deviation': pnl_series[pnl_series < 0].std() if (pnl_series < 0).any() else 0,
-            'calmar_ratio': pnl_series.mean() / abs(self._calculate_max_drawdown(pnl_series.cumsum())) if self._calculate_max_drawdown(pnl_series.cumsum()) != 0 else 0
+            "volatility": pnl_series.std(),
+            "var_95": pnl_series.quantile(0.05),  # Value at Risk 95%
+            "downside_deviation": (
+                pnl_series[pnl_series < 0].std() if (pnl_series < 0).any() else 0
+            ),
+            "calmar_ratio": (
+                pnl_series.mean()
+                / abs(self._calculate_max_drawdown(pnl_series.cumsum()))
+                if self._calculate_max_drawdown(pnl_series.cumsum()) != 0
+                else 0
+            ),
         }
-    
+
     def _calculate_max_drawdown(self, cumulative_pnl: pd.Series) -> float:
         """Calculate maximum drawdown"""
         if cumulative_pnl.empty:
             return 0
-        
+
         running_max = cumulative_pnl.cummax()
         drawdown = cumulative_pnl - running_max
         return drawdown.min()
-    
+
     def _calculate_consecutive_wins(self, pnl_series: pd.Series) -> int:
         """Calculate maximum consecutive wins"""
         if pnl_series.empty:
             return 0
-        
+
         wins = (pnl_series > 0).astype(int)
         max_consecutive = 0
         current_consecutive = 0
-        
+
         for win in wins:
             if win:
                 current_consecutive += 1
                 max_consecutive = max(max_consecutive, current_consecutive)
             else:
                 current_consecutive = 0
-        
+
         return max_consecutive
-    
+
     def _calculate_consecutive_losses(self, pnl_series: pd.Series) -> int:
         """Calculate maximum consecutive losses"""
         if pnl_series.empty:
             return 0
-        
+
         losses = (pnl_series < 0).astype(int)
         max_consecutive = 0
         current_consecutive = 0
-        
+
         for loss in losses:
             if loss:
                 current_consecutive += 1
                 max_consecutive = max(max_consecutive, current_consecutive)
             else:
                 current_consecutive = 0
-        
+
         return max_consecutive
-    
+
     def _calculate_buy_sell_ratio(self, activities: pd.DataFrame) -> Dict[str, Any]:
         """Calculate buy/sell ratios"""
         if activities.empty:
             return {}
-        
-        side_counts = activities['side'].value_counts()
-        side_volumes = activities.groupby('side')['value'].sum()
-        
+
+        side_counts = activities["side"].value_counts()
+        side_volumes = activities.groupby("side")["value"].sum()
+
         return {
-            'buy_count': side_counts.get('buy', 0),
-            'sell_count': side_counts.get('sell', 0) + side_counts.get('sell_short', 0),
-            'buy_volume': side_volumes.get('buy', 0),
-            'sell_volume': side_volumes.get('sell', 0) + side_volumes.get('sell_short', 0)
+            "buy_count": side_counts.get("buy", 0),
+            "sell_count": side_counts.get("sell", 0) + side_counts.get("sell_short", 0),
+            "buy_volume": side_volumes.get("buy", 0),
+            "sell_volume": side_volumes.get("sell", 0)
+            + side_volumes.get("sell_short", 0),
         }
-    
-    def _generate_interactive_html(self, target_date: date, data: Dict[str, Any]) -> str:
+
+    def _generate_interactive_html(
+        self, target_date: date, data: Dict[str, Any]
+    ) -> str:
         """Generate interactive HTML dashboard with charts and real-time updates"""
-        
+
         date_str = target_date.strftime("%B %d, %Y")
-        today = data.get('today_summary', {})
-        performance = data.get('performance_metrics', {})
-        symbols = data.get('symbol_analysis', {})
-        patterns = data.get('trading_patterns', {})
-        risk = data.get('risk_metrics', {})
-        activities = data.get('today_activities', pd.DataFrame())
-        calendar_analysis = data.get('calendar_analysis', {})
-        enhanced_performance = data.get('enhanced_performance', {})
-        
+        today = data.get("today_summary", {})
+        performance = data.get("performance_metrics", {})
+        symbols = data.get("symbol_analysis", {})
+        patterns = data.get("trading_patterns", {})
+        risk = data.get("risk_metrics", {})
+        activities = data.get("today_activities", pd.DataFrame())
+        calendar_analysis = data.get("calendar_analysis", {})
+        enhanced_performance = data.get("enhanced_performance", {})
+
         # Prepare data for JavaScript
-        historical_data = data.get('historical_summaries', pd.DataFrame())
+        historical_data = data.get("historical_summaries", pd.DataFrame())
         chart_data = self._prepare_chart_data(historical_data)
-        
+
         # Build calendar days HTML
         calendar_days_html = ""
-        for day in calendar_analysis.get('calendar_days', []):
-            today_class = 'today' if day.get('is_today', False) else ''
-            yesterday_class = 'yesterday' if day.get('is_yesterday', False) else ''
-            
+        for day in calendar_analysis.get("calendar_days", []):
+            today_class = "today" if day.get("is_today", False) else ""
+            yesterday_class = "yesterday" if day.get("is_yesterday", False) else ""
+
             # Format win rate and average trade for display
-            win_rate_display = f"{day.get('win_rate', 0):.0f}%" if day.get('win_rate', 0) > 0 else "0%"
-            avg_trade_display = f"${day.get('avg_trade', 0):+.2f}" if day.get('avg_trade', 0) != 0 else "$0.00"
-            
+            win_rate_display = (
+                f"{day.get('win_rate', 0):.0f}%" if day.get("win_rate", 0) > 0 else "0%"
+            )
+            avg_trade_display = (
+                f"${day.get('avg_trade', 0):+.2f}"
+                if day.get("avg_trade", 0) != 0
+                else "$0.00"
+            )
+
             calendar_days_html += f"""
                                 <div class="calendar-day {day['performance_class']} {today_class} {yesterday_class}">
                                     <div class="day-header">
@@ -514,13 +639,15 @@ class LiveDashboard:
                                         <small>{avg_trade_display} avg</small>
                                     </div>
                                 </div>"""
-        
+
         # Today's key metrics
-        today_pnl = today.get('alpaca_pnl', today.get('cash_flow_pnl', 0)) if today else 0
-        today_trades = today.get('total_trades', 0) if today else 0
-        today_symbols_count = today.get('unique_symbols', 0) if today else 0
-        today_volume = today.get('total_volume', 0) if today else 0
-        
+        today_pnl = (
+            today.get("alpaca_pnl", today.get("cash_flow_pnl", 0)) if today else 0
+        )
+        today_trades = today.get("total_trades", 0) if today else 0
+        today_symbols_count = today.get("unique_symbols", 0) if today else 0
+        today_volume = today.get("total_volume", 0) if today else 0
+
         html = f"""
         <!DOCTYPE html>
         <html>
@@ -1303,33 +1430,37 @@ class LiveDashboard:
         </body>
         </html>
         """
-        
+
         return html
-    
+
     def _prepare_chart_data(self, historical_data: pd.DataFrame) -> Dict[str, List]:
         """Prepare data for JavaScript charts"""
         if historical_data.empty:
-            return {'dates': [], 'pnl': [], 'volume': [], 'trades': []}
-        
+            return {"dates": [], "pnl": [], "volume": [], "trades": []}
+
         # Sort by date
-        historical_data = historical_data.sort_values('trade_date')
-        
+        historical_data = historical_data.sort_values("trade_date")
+
         # Use alpaca_pnl when available, fallback to cash_flow_pnl
-        pnl_data = historical_data['alpaca_pnl'].fillna(historical_data['cash_flow_pnl']).tolist()
-        
+        pnl_data = (
+            historical_data["alpaca_pnl"]
+            .fillna(historical_data["cash_flow_pnl"])
+            .tolist()
+        )
+
         return {
-            'dates': historical_data['trade_date'].tolist(),
-            'pnl': pnl_data,
-            'volume': historical_data['total_volume'].tolist(),
-            'trades': historical_data['total_trades'].tolist()
+            "dates": historical_data["trade_date"].tolist(),
+            "pnl": pnl_data,
+            "volume": historical_data["total_volume"].tolist(),
+            "trades": historical_data["total_trades"].tolist(),
         }
-    
+
     def _generate_symbol_table(self, symbols: Dict[str, Any]) -> str:
         """Generate enhanced symbol performance table with actual P&L"""
         if not symbols:
             return '<p style="text-align: center; color: #95a5a6; font-style: italic;">No symbol data available</p>'
-        
-        html = '''
+
+        html = """
         <table>
             <tr>
                 <th>Symbol</th>
@@ -1340,17 +1471,25 @@ class LiveDashboard:
                 <th>Vol %</th>
                 <th>Price Range</th>
             </tr>
-        '''
-        
+        """
+
         for symbol, data in symbols.items():
-            actual_pnl = data.get('estimated_actual_pnl', 0)
-            cash_flow_pnl = data.get('cash_flow_pnl', data.get('pnl_today', 0))
-            volume_prop = data.get('volume_proportion', 0)
-            
-            actual_pnl_class = 'positive' if actual_pnl > 0 else 'negative' if actual_pnl < 0 else 'neutral'
-            cash_flow_class = 'positive' if cash_flow_pnl > 0 else 'negative' if cash_flow_pnl < 0 else 'neutral'
-            
-            html += f'''
+            actual_pnl = data.get("estimated_actual_pnl", 0)
+            cash_flow_pnl = data.get("cash_flow_pnl", data.get("pnl_today", 0))
+            volume_prop = data.get("volume_proportion", 0)
+
+            actual_pnl_class = (
+                "positive"
+                if actual_pnl > 0
+                else "negative" if actual_pnl < 0 else "neutral"
+            )
+            cash_flow_class = (
+                "positive"
+                if cash_flow_pnl > 0
+                else "negative" if cash_flow_pnl < 0 else "neutral"
+            )
+
+            html += f"""
             <tr>
                 <td style="font-weight: bold;">{symbol}</td>
                 <td style="text-align: center;">{data['trades_today']}</td>
@@ -1369,9 +1508,9 @@ class LiveDashboard:
                     ${data['price_range']['max']:.2f}
                 </td>
             </tr>
-            '''
-        
-        html += '''
+            """
+
+        html += """
         </table>
         <div style="margin-top: 15px; padding: 10px; background: rgba(52, 152, 219, 0.1); border-radius: 5px; font-size: 0.9em;">
             <strong>📊 P&L Calculation Method:</strong><br>
@@ -1379,25 +1518,25 @@ class LiveDashboard:
             • <strong>Cash Flow:</strong> Simple sells - buys calculation<br>
             • ✅ Actual P&L includes fees, commissions, and multi-day position effects
         </div>
-        '''
+        """
         return html
-    
+
     def _generate_strategy_performance_table(self, patterns: Dict[str, Any]) -> str:
         """Generate enhanced strategy performance table with actual P&L"""
         if not patterns:
             return '<p style="text-align: center; color: #95a5a6; font-style: italic;">No strategy performance data available</p>'
-        
-        hourly_pnl = patterns.get('hourly_pnl_estimates', {})
-        hourly_cash_flow = patterns.get('hourly_cash_flow', {})
-        best_hour = patterns.get('best_pnl_hour')
-        worst_hour = patterns.get('worst_pnl_hour')
-        total_pnl = patterns.get('total_actual_pnl', 0)
-        method = patterns.get('pnl_calculation_method', 'Volume-weighted allocation')
-        
+
+        hourly_pnl = patterns.get("hourly_pnl_estimates", {})
+        hourly_cash_flow = patterns.get("hourly_cash_flow", {})
+        best_hour = patterns.get("best_pnl_hour")
+        worst_hour = patterns.get("worst_pnl_hour")
+        total_pnl = patterns.get("total_actual_pnl", 0)
+        method = patterns.get("pnl_calculation_method", "Volume-weighted allocation")
+
         if not hourly_pnl:
             return '<p style="text-align: center; color: #95a5a6; font-style: italic;">No hourly P&L data available</p>'
-        
-        html = f'''
+
+        html = f"""
         <div style="margin-bottom: 20px; padding: 15px; background: rgba(52, 152, 219, 0.1); border-radius: 8px;">
             <h4 style="color: #3498db; margin-bottom: 10px;">📊 Enhanced Strategy Performance Analysis</h4>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
@@ -1425,23 +1564,37 @@ class LiveDashboard:
                 <th>Trades</th>
                 <th>Performance</th>
             </tr>
-        '''
-        
-        trading_dist = patterns.get('trading_distribution', {})
-        
+        """
+
+        trading_dist = patterns.get("trading_distribution", {})
+
         for hour in sorted(hourly_pnl.keys()):
             actual_pnl = hourly_pnl[hour]
             cash_flow = hourly_cash_flow.get(hour, 0)
             difference = actual_pnl - cash_flow
             trades = trading_dist.get(hour, 0)
-            
-            actual_class = 'positive' if actual_pnl > 0 else 'negative' if actual_pnl < 0 else 'neutral'
-            cash_class = 'positive' if cash_flow > 0 else 'negative' if cash_flow < 0 else 'neutral'
-            diff_class = 'positive' if difference > 0 else 'negative' if difference < 0 else 'neutral'
-            
-            performance_icon = "🚀" if actual_pnl > 0 else "📉" if actual_pnl < 0 else "➡️"
-            
-            html += f'''
+
+            actual_class = (
+                "positive"
+                if actual_pnl > 0
+                else "negative" if actual_pnl < 0 else "neutral"
+            )
+            cash_class = (
+                "positive"
+                if cash_flow > 0
+                else "negative" if cash_flow < 0 else "neutral"
+            )
+            diff_class = (
+                "positive"
+                if difference > 0
+                else "negative" if difference < 0 else "neutral"
+            )
+
+            performance_icon = (
+                "🚀" if actual_pnl > 0 else "📉" if actual_pnl < 0 else "➡️"
+            )
+
+            html += f"""
             <tr>
                 <td style="font-weight: bold; text-align: center;">{hour}:00</td>
                 <td style="text-align: right;" class="{actual_class}">
@@ -1459,9 +1612,9 @@ class LiveDashboard:
                 <td style="text-align: center;">{trades}</td>
                 <td style="text-align: center; font-size: 1.2em;">{performance_icon}</td>
             </tr>
-            '''
-        
-        html += f'''
+            """
+
+        html += f"""
         </table>
         
         <div style="margin-top: 15px; padding: 12px; background: rgba(39, 174, 96, 0.1); border-radius: 5px; font-size: 0.9em;">
@@ -1472,53 +1625,87 @@ class LiveDashboard:
             • Reflects true trading profitability<br>
             • Volume-weighted hourly allocation for pattern analysis
         </div>
-        '''
-        
+        """
+
         return html
-    
-    def _generate_risk_analysis_table(self, performance: Dict[str, Any], risk: Dict[str, Any]) -> str:
+
+    def _generate_risk_analysis_table(
+        self, performance: Dict[str, Any], risk: Dict[str, Any]
+    ) -> str:
         """Generate risk analysis table"""
-        html = '''
+        html = """
         <table>
             <tr>
                 <th>Risk Metric</th>
                 <th>Value</th>
                 <th>Description</th>
             </tr>
-        '''
-        
+        """
+
         metrics = [
-            ('Sharpe Ratio', f"{performance.get('sharpe_ratio', 0):.2f}", 'Risk-adjusted return'),
-            ('Max Drawdown', f"${performance.get('max_drawdown', 0):.2f}", 'Maximum peak-to-trough loss'),
-            ('Volatility', f"${risk.get('volatility', 0):.2f}", 'Standard deviation of returns'),
-            ('Value at Risk (95%)', f"${risk.get('var_95', 0):.2f}", 'Potential loss with 95% confidence'),
-            ('Win Rate', f"{performance.get('win_rate', 0):.1f}%", 'Percentage of profitable days'),
-            ('Consecutive Wins', f"{performance.get('consecutive_wins', 0)}", 'Maximum consecutive profitable days'),
-            ('Consecutive Losses', f"{performance.get('consecutive_losses', 0)}", 'Maximum consecutive losing days'),
-            ('Calmar Ratio', f"{risk.get('calmar_ratio', 0):.2f}", 'Annual return / Max drawdown')
+            (
+                "Sharpe Ratio",
+                f"{performance.get('sharpe_ratio', 0):.2f}",
+                "Risk-adjusted return",
+            ),
+            (
+                "Max Drawdown",
+                f"${performance.get('max_drawdown', 0):.2f}",
+                "Maximum peak-to-trough loss",
+            ),
+            (
+                "Volatility",
+                f"${risk.get('volatility', 0):.2f}",
+                "Standard deviation of returns",
+            ),
+            (
+                "Value at Risk (95%)",
+                f"${risk.get('var_95', 0):.2f}",
+                "Potential loss with 95% confidence",
+            ),
+            (
+                "Win Rate",
+                f"{performance.get('win_rate', 0):.1f}%",
+                "Percentage of profitable days",
+            ),
+            (
+                "Consecutive Wins",
+                f"{performance.get('consecutive_wins', 0)}",
+                "Maximum consecutive profitable days",
+            ),
+            (
+                "Consecutive Losses",
+                f"{performance.get('consecutive_losses', 0)}",
+                "Maximum consecutive losing days",
+            ),
+            (
+                "Calmar Ratio",
+                f"{risk.get('calmar_ratio', 0):.2f}",
+                "Annual return / Max drawdown",
+            ),
         ]
-        
+
         for metric, value, description in metrics:
-            html += f'''
+            html += f"""
             <tr>
                 <td style="font-weight: bold;">{metric}</td>
                 <td style="text-align: right;">{value}</td>
                 <td style="color: #95a5a6;">{description}</td>
             </tr>
-            '''
-        
-        html += '</table>'
+            """
+
+        html += "</table>"
         return html
-    
+
     def _generate_recent_trades_table(self, activities: pd.DataFrame) -> str:
         """Generate recent trades table"""
         if activities.empty:
             return '<p style="text-align: center; color: #95a5a6; font-style: italic;">No trades executed today</p>'
-        
+
         # Get last 10 trades
         recent_trades = activities.tail(10)
-        
-        html = '''
+
+        html = """
         <table>
             <tr>
                 <th>Time</th>
@@ -1528,25 +1715,25 @@ class LiveDashboard:
                 <th>Price</th>
                 <th>Value</th>
             </tr>
-        '''
-        
+        """
+
         for _, trade in recent_trades.iterrows():
             # Use transaction_time column
-            if 'transaction_time' in trade.index:
-                timestamp = pd.to_datetime(trade['transaction_time'])
-                time_str = timestamp.strftime('%H:%M:%S')
+            if "transaction_time" in trade.index:
+                timestamp = pd.to_datetime(trade["transaction_time"])
+                time_str = timestamp.strftime("%H:%M:%S")
             else:
-                time_str = 'N/A'
-            
+                time_str = "N/A"
+
             side_icon = {
-                'buy': '🛒 BUY',
-                'sell': '💰 SELL',
-                'sell_short': '💰 SELL_SHORT'
-            }.get(trade['side'], trade['side'])
-            
-            side_color = 'red' if trade['side'] == 'buy' else 'green'
-            
-            html += f'''
+                "buy": "🛒 BUY",
+                "sell": "💰 SELL",
+                "sell_short": "💰 SELL_SHORT",
+            }.get(trade["side"], trade["side"])
+
+            side_color = "red" if trade["side"] == "buy" else "green"
+
+            html += f"""
             <tr>
                 <td>{time_str}</td>
                 <td style="font-weight: bold;">{trade['symbol']}</td>
@@ -1555,10 +1742,11 @@ class LiveDashboard:
                 <td style="text-align: right;">${trade['price']:.2f}</td>
                 <td style="text-align: right;">${trade['value']:.2f}</td>
             </tr>
-            '''
-        
-        html += '</table>'
+            """
+
+        html += "</table>"
         return html
+
 
 def main():
     """Generate live dashboard"""
@@ -1567,10 +1755,11 @@ def main():
         dashboard_file = dashboard.generate_live_dashboard()
         print(f"✅ Live dashboard generated: {dashboard_file}")
         return dashboard_file
-        
+
     except Exception as e:
         print(f"❌ Error generating live dashboard: {str(e)}")
         return None
+
 
 if __name__ == "__main__":
     main()

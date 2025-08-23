@@ -14,21 +14,22 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.data_manager import DataManager
 from utils.logger import setup_logger
 
+
 class InteractiveDashboardBuilder:
     """Builder for various types of interactive dashboards"""
-    
+
     def __init__(self):
         self.logger = setup_logger("InteractiveDashboardBuilder")
         self.data_manager = DataManager()
         self.api = self.data_manager.api
-    
+
     def display_options(self):
         """Display all available interactive dashboard options"""
-        
+
         print("🚀 PYTHON INTERACTIVE DASHBOARD OPTIONS FOR TRADING DATA")
         print("=" * 80)
         print()
-        
+
         print("1️⃣  PLOTLY DASH - MOST POPULAR")
         print("   ✅ Real-time updates")
         print("   ✅ Professional web interface")
@@ -37,7 +38,7 @@ class InteractiveDashboardBuilder:
         print("   ✅ Mobile responsive")
         print("   📊 Perfect for: Executive dashboards, client presentations")
         print()
-        
+
         print("2️⃣  STREAMLIT - EASIEST TO BUILD")
         print("   ✅ Extremely simple Python code")
         print("   ✅ Auto-refresh widgets")
@@ -45,7 +46,7 @@ class InteractiveDashboardBuilder:
         print("   ✅ Built-in authentication")
         print("   📊 Perfect for: Quick prototypes, data exploration")
         print()
-        
+
         print("3️⃣  FLASK/FASTAPI + PLOTLY.JS - MOST FLEXIBLE")
         print("   ✅ Full control over everything")
         print("   ✅ Custom APIs")
@@ -53,7 +54,7 @@ class InteractiveDashboardBuilder:
         print("   ✅ Advanced authentication")
         print("   📊 Perfect for: Production systems, complex workflows")
         print()
-        
+
         print("4️⃣  JUPYTER WIDGETS - FOR ANALYSIS")
         print("   ✅ Interactive notebooks")
         print("   ✅ Real-time parameter adjustment")
@@ -61,7 +62,7 @@ class InteractiveDashboardBuilder:
         print("   ✅ Great for research")
         print("   📊 Perfect for: Strategy development, backtesting")
         print()
-        
+
         print("5️⃣  PANEL/BOKEH - ADVANCED FEATURES")
         print("   ✅ High-performance streaming")
         print("   ✅ Large dataset handling")
@@ -69,7 +70,7 @@ class InteractiveDashboardBuilder:
         print("   ✅ Server deployment")
         print("   📊 Perfect for: Real-time trading monitoring")
         print()
-        
+
         print("6️⃣  GRADIO - AI/ML FOCUSED")
         print("   ✅ Machine learning model interfaces")
         print("   ✅ Quick sharing")
@@ -77,22 +78,23 @@ class InteractiveDashboardBuilder:
         print("   ✅ API integration")
         print("   📊 Perfect for: Strategy prediction, model testing")
         print()
-        
+
         print("RECOMMENDATION FOR YOUR SCALPING BOT:")
         print("🎯 START WITH: Streamlit (easiest)")
         print("🎯 UPGRADE TO: Plotly Dash (most professional)")
         print("🎯 ADVANCED: Flask + Plotly.js (full control)")
         print()
-        
+
         print("Would you like me to create:")
         print("A) Streamlit interactive dashboard (quickest to build)")
         print("B) Plotly Dash professional dashboard (most features)")
         print("C) Flask web app with real-time updates (most flexible)")
         print("D) All three examples for comparison")
 
+
 def create_streamlit_example():
     """Create a Streamlit interactive dashboard example"""
-    
+
     streamlit_code = '''
 import streamlit as st
 import plotly.graph_objects as go
@@ -292,12 +294,13 @@ def calculate_pnl(df):
 if __name__ == "__main__":
     main()
     '''
-    
+
     return streamlit_code
+
 
 def create_plotly_dash_example():
     """Create a Plotly Dash interactive dashboard example"""
-    
+
     dash_code = '''
 import dash
 from dash import dcc, html, Input, Output, dash_table
@@ -710,14 +713,15 @@ def create_empty_dashboard():
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8050)
     '''
-    
+
     return dash_code
+
 
 def main():
     """Main function to display options"""
     builder = InteractiveDashboardBuilder()
     builder.display_options()
-    
+
     print("\n🎯 RECOMMENDED NEXT STEPS:")
     print("1. Install required packages:")
     print("   pip install streamlit plotly dash")
@@ -726,6 +730,7 @@ def main():
     print("3. I'll create the complete interactive dashboard code")
     print()
     print("Which framework would you like me to implement first?")
+
 
 if __name__ == "__main__":
     main()

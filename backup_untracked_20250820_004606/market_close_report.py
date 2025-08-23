@@ -19,7 +19,8 @@ from scipy import stats
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -29,51 +30,49 @@ import alpaca_trade_api as tradeapi
 from config import config
 from utils.logger import setup_logger
 
+
 class MarketCloseReportGenerator:
     """Generate comprehensive market close reports with insights and recommendations"""
-    
+
     def __init__(self):
-        self.logger = setup_logger('market_close_report')
+        self.logger = setup_logger("market_close_report")
         self.today = date.today()
         self.yesterday = self.today - timedelta(days=1)
-        
+
         # Connect to Alpaca
         self.api = tradeapi.REST(
-            config['ALPACA_API_KEY'],
-            config['ALPACA_SECRET_KEY'], 
-            config['ALPACA_BASE_URL']
+            config["ALPACA_API_KEY"],
+            config["ALPACA_SECRET_KEY"],
+            config["ALPACA_BASE_URL"],
         )
-        
+
         # Set up reports directory
         self.reports_dir = Path("reports") / self.today.strftime("%Y-%m-%d")
         self.reports_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Configure matplotlib for better charts
-        plt.style.use('seaborn-v0_8')
+        plt.style.use("seaborn-v0_8")
         sns.set_palette("husl")
-        
+
         print(f"📊 MARKET CLOSE REPORT GENERATOR - {self.today.strftime('%B %d, %Y')}")
-        print("="*80)
+        print("=" * 80)
 
     def get_extended_orders(self):
         """Get orders from yesterday and today to capture cross-day trades"""
         try:
             # Get orders from yesterday and today
             yesterday_start = datetime.combine(self.yesterday, datetime.min.time())
-            formatted_date = yesterday_start.strftime('%Y-%m-%dT%H:%M:%SZ')
-            
-            orders = self.api.list_orders(
-                status='all',
-                after=formatted_date
-            )
-            
+            formatted_date = yesterday_start.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            orders = self.api.list_orders(status="all", after=formatted_date)
+
             # Filter for filled orders only
-            filled_orders = [o for o in orders if o.status == 'filled']
-            
+            filled_orders = [o for o in orders if o.status == "filled"]
+
             # Separate today's orders vs yesterday's orders
             today_orders = []
             yesterday_orders = []
-            
+
             for order in filled_orders:
                 if order.filled_at:
                     order_date = order.filled_at.date()
@@ -81,472 +80,514 @@ class MarketCloseReportGenerator:
                         today_orders.append(order)
                     elif order_date == self.yesterday:
                         yesterday_orders.append(order)
-            
+
             self.logger.info(f"Found {len(today_orders)} orders filled today")
             self.logger.info(f"Found {len(yesterday_orders)} orders filled yesterday")
-            
+
             return today_orders, yesterday_orders
-            
+
         except Exception as e:
             self.logger.error(f"Error getting orders: {e}")
             return [], []
 
     def analyze_trade_performance(self, today_orders, yesterday_orders):
         """Analyze trade performance with detailed insights and statistical analysis"""
-        
+
         # Combine and analyze all trades
         all_orders = today_orders + yesterday_orders
-        
+
         if not all_orders:
             return {
-                'trade_summary': {},
-                'time_analysis': {},
-                'side_analysis': {},
-                'symbol_performance': {},
-                'statistical_analysis': {},
-                'risk_metrics': {},
-                'trading_psychology': {},
-                'recommendations': []
+                "trade_summary": {},
+                "time_analysis": {},
+                "side_analysis": {},
+                "symbol_performance": {},
+                "statistical_analysis": {},
+                "risk_metrics": {},
+                "trading_psychology": {},
+                "recommendations": [],
             }
-        
+
         # Convert to DataFrame for easier analysis
         trades_data = []
         for order in all_orders:
-            trades_data.append({
-                'symbol': order.symbol,
-                'side': order.side,
-                'qty': float(order.filled_qty),
-                'price': float(order.filled_avg_price),
-                'value': float(order.filled_qty) * float(order.filled_avg_price),
-                'filled_at': order.filled_at,
-                'order_id': order.id,
-                'date': order.filled_at.date(),
-                'hour': order.filled_at.hour,
-                'minute': order.filled_at.minute
-            })
-        
+            trades_data.append(
+                {
+                    "symbol": order.symbol,
+                    "side": order.side,
+                    "qty": float(order.filled_qty),
+                    "price": float(order.filled_avg_price),
+                    "value": float(order.filled_qty) * float(order.filled_avg_price),
+                    "filled_at": order.filled_at,
+                    "order_id": order.id,
+                    "date": order.filled_at.date(),
+                    "hour": order.filled_at.hour,
+                    "minute": order.filled_at.minute,
+                }
+            )
+
         df = pd.DataFrame(trades_data)
-        
+
         # Calculate P&L for each trade pair
         df_with_pnl = self._calculate_trade_pnl(df)
-        
+
         # Analyze by symbol with P&L calculation
         symbol_analysis = self._analyze_symbol_performance(df)
-        
+
         # Analyze by time of day
         time_analysis = self._analyze_time_performance(df)
-        
+
         # Analyze by trade side (long/short)
         side_analysis = self._analyze_side_performance(df)
-        
+
         # Statistical analysis
         statistical_analysis = self._perform_statistical_analysis(df_with_pnl)
-        
+
         # Risk metrics
         risk_metrics = self._calculate_risk_metrics(df_with_pnl)
-        
+
         # Trading psychology metrics
         trading_psychology = self._analyze_trading_psychology(df_with_pnl)
-        
+
         # Generate trading recommendations
-        recommendations = self._generate_recommendations(symbol_analysis, time_analysis, side_analysis, statistical_analysis, risk_metrics)
-        
+        recommendations = self._generate_recommendations(
+            symbol_analysis,
+            time_analysis,
+            side_analysis,
+            statistical_analysis,
+            risk_metrics,
+        )
+
         return {
-            'trade_summary': self._get_trade_summary(df),
-            'time_analysis': time_analysis,
-            'side_analysis': side_analysis,
-            'symbol_performance': symbol_analysis,
-            'statistical_analysis': statistical_analysis,
-            'risk_metrics': risk_metrics,
-            'trading_psychology': trading_psychology,
-            'recommendations': recommendations,
-            'trades_data': df_with_pnl,  # Include the completed trades data for equity curve
-            'raw_data': df
+            "trade_summary": self._get_trade_summary(df),
+            "time_analysis": time_analysis,
+            "side_analysis": side_analysis,
+            "symbol_performance": symbol_analysis,
+            "statistical_analysis": statistical_analysis,
+            "risk_metrics": risk_metrics,
+            "trading_psychology": trading_psychology,
+            "recommendations": recommendations,
+            "trades_data": df_with_pnl,  # Include the completed trades data for equity curve
+            "raw_data": df,
         }
 
     def _analyze_symbol_performance(self, df):
         """Analyze performance by symbol"""
         symbol_stats = {}
-        
-        for symbol in df['symbol'].unique():
-            symbol_trades = df[df['symbol'] == symbol]
-            
-            buys = symbol_trades[symbol_trades['side'] == 'buy']
-            sells = symbol_trades[symbol_trades['side'] == 'sell']
-            
-            total_bought = buys['qty'].sum()
-            total_sold = sells['qty'].sum()
-            
-            buy_value = buys['value'].sum()
-            sell_value = sells['value'].sum()
-            
+
+        for symbol in df["symbol"].unique():
+            symbol_trades = df[df["symbol"] == symbol]
+
+            buys = symbol_trades[symbol_trades["side"] == "buy"]
+            sells = symbol_trades[symbol_trades["side"] == "sell"]
+
+            total_bought = buys["qty"].sum()
+            total_sold = sells["qty"].sum()
+
+            buy_value = buys["value"].sum()
+            sell_value = sells["value"].sum()
+
             # Calculate P&L
             pnl = 0
             pnl_pct = 0
-            
+
             if total_bought > 0 and total_sold > 0:
                 avg_buy = buy_value / total_bought
                 avg_sell = sell_value / total_sold
                 closed_qty = min(total_bought, total_sold)
                 pnl = (avg_sell - avg_buy) * closed_qty
                 pnl_pct = (pnl / (avg_buy * closed_qty)) * 100 if avg_buy > 0 else 0
-            
+
             # Trade timing analysis
-            trade_times = symbol_trades['hour'].tolist()
+            trade_times = symbol_trades["hour"].tolist()
             avg_trade_time = np.mean(trade_times) if trade_times else 0
-            
+
             symbol_stats[symbol] = {
-                'total_trades': len(symbol_trades),
-                'total_volume': symbol_trades['value'].sum(),
-                'pnl': pnl,
-                'pnl_pct': pnl_pct,
-                'avg_trade_time': avg_trade_time,
-                'buys': len(buys),
-                'sells': len(sells),
-                'avg_buy_price': buy_value / total_bought if total_bought > 0 else 0,
-                'avg_sell_price': sell_value / total_sold if total_sold > 0 else 0,
-                'trade_times': trade_times,
-                'first_trade': symbol_trades['filled_at'].min(),
-                'last_trade': symbol_trades['filled_at'].max()
+                "total_trades": len(symbol_trades),
+                "total_volume": symbol_trades["value"].sum(),
+                "pnl": pnl,
+                "pnl_pct": pnl_pct,
+                "avg_trade_time": avg_trade_time,
+                "buys": len(buys),
+                "sells": len(sells),
+                "avg_buy_price": buy_value / total_bought if total_bought > 0 else 0,
+                "avg_sell_price": sell_value / total_sold if total_sold > 0 else 0,
+                "trade_times": trade_times,
+                "first_trade": symbol_trades["filled_at"].min(),
+                "last_trade": symbol_trades["filled_at"].max(),
             }
-        
+
         return symbol_stats
 
     def _analyze_time_performance(self, df):
         """Analyze performance by time of day"""
-        
+
         # Group by hour
         hourly_stats = {}
-        
+
         for hour in range(9, 16):  # Market hours 9:30 AM to 4:00 PM
-            hour_trades = df[df['hour'] == hour]
-            
+            hour_trades = df[df["hour"] == hour]
+
             if len(hour_trades) > 0:
                 # Calculate P&L for this hour
                 hour_pnl = 0
-                hour_volume = hour_trades['value'].sum()
-                
+                hour_volume = hour_trades["value"].sum()
+
                 # Group by symbol for P&L calculation
-                for symbol in hour_trades['symbol'].unique():
-                    symbol_hour = hour_trades[hour_trades['symbol'] == symbol]
-                    buys = symbol_hour[symbol_hour['side'] == 'buy']
-                    sells = symbol_hour[symbol_hour['side'] == 'sell']
-                    
+                for symbol in hour_trades["symbol"].unique():
+                    symbol_hour = hour_trades[hour_trades["symbol"] == symbol]
+                    buys = symbol_hour[symbol_hour["side"] == "buy"]
+                    sells = symbol_hour[symbol_hour["side"] == "sell"]
+
                     if len(buys) > 0 and len(sells) > 0:
-                        avg_buy = (buys['qty'] * buys['price']).sum() / buys['qty'].sum()
-                        avg_sell = (sells['qty'] * sells['price']).sum() / sells['qty'].sum()
-                        qty = min(buys['qty'].sum(), sells['qty'].sum())
+                        avg_buy = (buys["qty"] * buys["price"]).sum() / buys[
+                            "qty"
+                        ].sum()
+                        avg_sell = (sells["qty"] * sells["price"]).sum() / sells[
+                            "qty"
+                        ].sum()
+                        qty = min(buys["qty"].sum(), sells["qty"].sum())
                         hour_pnl += (avg_sell - avg_buy) * qty
-                
+
                 hourly_stats[hour] = {
-                    'trades': len(hour_trades),
-                    'volume': hour_volume,
-                    'pnl': hour_pnl,
-                    'symbols': hour_trades['symbol'].unique().tolist(),
-                    'avg_trade_size': hour_volume / len(hour_trades)
+                    "trades": len(hour_trades),
+                    "volume": hour_volume,
+                    "pnl": hour_pnl,
+                    "symbols": hour_trades["symbol"].unique().tolist(),
+                    "avg_trade_size": hour_volume / len(hour_trades),
                 }
-        
+
         return hourly_stats
 
     def _analyze_side_performance(self, df):
         """Analyze performance by trade side (long/short bias)"""
-        
+
         side_stats = {
-            'long_bias_symbols': [],
-            'short_bias_symbols': [],
-            'balanced_symbols': []
+            "long_bias_symbols": [],
+            "short_bias_symbols": [],
+            "balanced_symbols": [],
         }
-        
-        for symbol in df['symbol'].unique():
-            symbol_trades = df[df['symbol'] == symbol]
-            buys = len(symbol_trades[symbol_trades['side'] == 'buy'])
-            sells = len(symbol_trades[symbol_trades['side'] == 'sell'])
-            
+
+        for symbol in df["symbol"].unique():
+            symbol_trades = df[df["symbol"] == symbol]
+            buys = len(symbol_trades[symbol_trades["side"] == "buy"])
+            sells = len(symbol_trades[symbol_trades["side"] == "sell"])
+
             total = buys + sells
             if total > 0:
                 buy_ratio = buys / total
-                
+
                 if buy_ratio > 0.6:
-                    side_stats['long_bias_symbols'].append({
-                        'symbol': symbol,
-                        'buy_ratio': buy_ratio,
-                        'trades': total
-                    })
+                    side_stats["long_bias_symbols"].append(
+                        {"symbol": symbol, "buy_ratio": buy_ratio, "trades": total}
+                    )
                 elif buy_ratio < 0.4:
-                    side_stats['short_bias_symbols'].append({
-                        'symbol': symbol,
-                        'buy_ratio': buy_ratio,
-                        'trades': total
-                    })
+                    side_stats["short_bias_symbols"].append(
+                        {"symbol": symbol, "buy_ratio": buy_ratio, "trades": total}
+                    )
                 else:
-                    side_stats['balanced_symbols'].append({
-                        'symbol': symbol,
-                        'buy_ratio': buy_ratio,
-                        'trades': total
-                    })
-        
+                    side_stats["balanced_symbols"].append(
+                        {"symbol": symbol, "buy_ratio": buy_ratio, "trades": total}
+                    )
+
         return side_stats
 
     def _calculate_trade_pnl(self, df):
         """Calculate P&L for each complete trade (buy-sell pair)"""
         trades_with_pnl = []
-        
-        for symbol in df['symbol'].unique():
-            symbol_trades = df[df['symbol'] == symbol].sort_values('filled_at')
-            
-            buys = symbol_trades[symbol_trades['side'] == 'buy'].copy()
-            sells = symbol_trades[symbol_trades['side'] == 'sell'].copy()
-            
+
+        for symbol in df["symbol"].unique():
+            symbol_trades = df[df["symbol"] == symbol].sort_values("filled_at")
+
+            buys = symbol_trades[symbol_trades["side"] == "buy"].copy()
+            sells = symbol_trades[symbol_trades["side"] == "sell"].copy()
+
             # Match buys with sells (FIFO method)
             buy_idx = 0
             sell_idx = 0
-            
+
             while buy_idx < len(buys) and sell_idx < len(sells):
                 buy_trade = buys.iloc[buy_idx]
                 sell_trade = sells.iloc[sell_idx]
-                
+
                 # Determine trade quantity (minimum of remaining buy/sell qty)
-                trade_qty = min(buy_trade['qty'], sell_trade['qty'])
-                
+                trade_qty = min(buy_trade["qty"], sell_trade["qty"])
+
                 # Calculate P&L
-                pnl = (sell_trade['price'] - buy_trade['price']) * trade_qty
-                pnl_pct = (pnl / (buy_trade['price'] * trade_qty)) * 100
-                
+                pnl = (sell_trade["price"] - buy_trade["price"]) * trade_qty
+                pnl_pct = (pnl / (buy_trade["price"] * trade_qty)) * 100
+
                 # Calculate holding period
-                holding_period = (sell_trade['filled_at'] - buy_trade['filled_at']).total_seconds() / 60  # minutes
-                
-                trades_with_pnl.append({
-                    'symbol': symbol,
-                    'entry_time': buy_trade['filled_at'],
-                    'exit_time': sell_trade['filled_at'],
-                    'entry_price': buy_trade['price'],
-                    'exit_price': sell_trade['price'],
-                    'quantity': trade_qty,
-                    'pnl': pnl,
-                    'pnl_pct': pnl_pct,
-                    'holding_period_minutes': holding_period,
-                    'entry_hour': buy_trade['hour'],
-                    'exit_hour': sell_trade['hour'],
-                    'trade_value': buy_trade['price'] * trade_qty
-                })
-                
+                holding_period = (
+                    sell_trade["filled_at"] - buy_trade["filled_at"]
+                ).total_seconds() / 60  # minutes
+
+                trades_with_pnl.append(
+                    {
+                        "symbol": symbol,
+                        "entry_time": buy_trade["filled_at"],
+                        "exit_time": sell_trade["filled_at"],
+                        "entry_price": buy_trade["price"],
+                        "exit_price": sell_trade["price"],
+                        "quantity": trade_qty,
+                        "pnl": pnl,
+                        "pnl_pct": pnl_pct,
+                        "holding_period_minutes": holding_period,
+                        "entry_hour": buy_trade["hour"],
+                        "exit_hour": sell_trade["hour"],
+                        "trade_value": buy_trade["price"] * trade_qty,
+                    }
+                )
+
                 # Update remaining quantities
-                buys.iloc[buy_idx, buys.columns.get_loc('qty')] -= trade_qty
-                sells.iloc[sell_idx, sells.columns.get_loc('qty')] -= trade_qty
-                
+                buys.iloc[buy_idx, buys.columns.get_loc("qty")] -= trade_qty
+                sells.iloc[sell_idx, sells.columns.get_loc("qty")] -= trade_qty
+
                 # Move to next trade if current one is complete
-                if buys.iloc[buy_idx]['qty'] <= 0:
+                if buys.iloc[buy_idx]["qty"] <= 0:
                     buy_idx += 1
-                if sells.iloc[sell_idx]['qty'] <= 0:
+                if sells.iloc[sell_idx]["qty"] <= 0:
                     sell_idx += 1
-        
+
         return pd.DataFrame(trades_with_pnl)
 
     def _perform_statistical_analysis(self, trades_df):
         """Perform comprehensive statistical analysis on trades"""
         if trades_df.empty:
             return {}
-        
-        pnl_values = trades_df['pnl'].values
-        pnl_pct_values = trades_df['pnl_pct'].values
-        holding_periods = trades_df['holding_period_minutes'].values
-        
+
+        pnl_values = trades_df["pnl"].values
+        pnl_pct_values = trades_df["pnl_pct"].values
+        holding_periods = trades_df["holding_period_minutes"].values
+
         # Basic statistics
         basic_stats = {
-            'total_completed_trades': len(trades_df),
-            'winning_trades': len(trades_df[trades_df['pnl'] > 0]),
-            'losing_trades': len(trades_df[trades_df['pnl'] < 0]),
-            'breakeven_trades': len(trades_df[trades_df['pnl'] == 0]),
-            'win_rate': len(trades_df[trades_df['pnl'] > 0]) / len(trades_df) * 100,
-            'avg_win': trades_df[trades_df['pnl'] > 0]['pnl'].mean() if len(trades_df[trades_df['pnl'] > 0]) > 0 else 0,
-            'avg_loss': trades_df[trades_df['pnl'] < 0]['pnl'].mean() if len(trades_df[trades_df['pnl'] < 0]) > 0 else 0,
-            'largest_win': trades_df['pnl'].max(),
-            'largest_loss': trades_df['pnl'].min(),
-            'total_pnl': trades_df['pnl'].sum(),
-            'avg_pnl': trades_df['pnl'].mean(),
-            'median_pnl': trades_df['pnl'].median()
+            "total_completed_trades": len(trades_df),
+            "winning_trades": len(trades_df[trades_df["pnl"] > 0]),
+            "losing_trades": len(trades_df[trades_df["pnl"] < 0]),
+            "breakeven_trades": len(trades_df[trades_df["pnl"] == 0]),
+            "win_rate": len(trades_df[trades_df["pnl"] > 0]) / len(trades_df) * 100,
+            "avg_win": (
+                trades_df[trades_df["pnl"] > 0]["pnl"].mean()
+                if len(trades_df[trades_df["pnl"] > 0]) > 0
+                else 0
+            ),
+            "avg_loss": (
+                trades_df[trades_df["pnl"] < 0]["pnl"].mean()
+                if len(trades_df[trades_df["pnl"] < 0]) > 0
+                else 0
+            ),
+            "largest_win": trades_df["pnl"].max(),
+            "largest_loss": trades_df["pnl"].min(),
+            "total_pnl": trades_df["pnl"].sum(),
+            "avg_pnl": trades_df["pnl"].mean(),
+            "median_pnl": trades_df["pnl"].median(),
         }
-        
+
         # Risk-adjusted metrics
-        if basic_stats['avg_loss'] != 0:
-            basic_stats['profit_factor'] = abs(basic_stats['avg_win'] * basic_stats['winning_trades']) / abs(basic_stats['avg_loss'] * basic_stats['losing_trades'])
-            basic_stats['reward_risk_ratio'] = abs(basic_stats['avg_win']) / abs(basic_stats['avg_loss'])
+        if basic_stats["avg_loss"] != 0:
+            basic_stats["profit_factor"] = abs(
+                basic_stats["avg_win"] * basic_stats["winning_trades"]
+            ) / abs(basic_stats["avg_loss"] * basic_stats["losing_trades"])
+            basic_stats["reward_risk_ratio"] = abs(basic_stats["avg_win"]) / abs(
+                basic_stats["avg_loss"]
+            )
         else:
-            basic_stats['profit_factor'] = float('inf') if basic_stats['avg_win'] > 0 else 0
-            basic_stats['reward_risk_ratio'] = float('inf') if basic_stats['avg_win'] > 0 else 0
-        
+            basic_stats["profit_factor"] = (
+                float("inf") if basic_stats["avg_win"] > 0 else 0
+            )
+            basic_stats["reward_risk_ratio"] = (
+                float("inf") if basic_stats["avg_win"] > 0 else 0
+            )
+
         # Distribution analysis
         distribution_stats = {
-            'pnl_std': np.std(pnl_values),
-            'pnl_variance': np.var(pnl_values),
-            'pnl_skewness': stats.skew(pnl_values),
-            'pnl_kurtosis': stats.kurtosis(pnl_values),
-            'pnl_range': basic_stats['largest_win'] - basic_stats['largest_loss'],
-            'pnl_iqr': np.percentile(pnl_values, 75) - np.percentile(pnl_values, 25),
-            'pnl_25th_percentile': np.percentile(pnl_values, 25),
-            'pnl_75th_percentile': np.percentile(pnl_values, 75)
+            "pnl_std": np.std(pnl_values),
+            "pnl_variance": np.var(pnl_values),
+            "pnl_skewness": stats.skew(pnl_values),
+            "pnl_kurtosis": stats.kurtosis(pnl_values),
+            "pnl_range": basic_stats["largest_win"] - basic_stats["largest_loss"],
+            "pnl_iqr": np.percentile(pnl_values, 75) - np.percentile(pnl_values, 25),
+            "pnl_25th_percentile": np.percentile(pnl_values, 25),
+            "pnl_75th_percentile": np.percentile(pnl_values, 75),
         }
-        
+
         # Holding period analysis
         holding_stats = {
-            'avg_holding_period': np.mean(holding_periods),
-            'median_holding_period': np.median(holding_periods),
-            'max_holding_period': np.max(holding_periods),
-            'min_holding_period': np.min(holding_periods),
-            'holding_period_std': np.std(holding_periods)
+            "avg_holding_period": np.mean(holding_periods),
+            "median_holding_period": np.median(holding_periods),
+            "max_holding_period": np.max(holding_periods),
+            "min_holding_period": np.min(holding_periods),
+            "holding_period_std": np.std(holding_periods),
         }
-        
+
         # Normality tests
         if len(pnl_values) >= 8:  # Minimum sample size for meaningful test
             shapiro_stat, shapiro_p = stats.shapiro(pnl_values)
             normality_test = {
-                'shapiro_statistic': shapiro_stat,
-                'shapiro_p_value': shapiro_p,
-                'is_normal_distribution': shapiro_p > 0.05
+                "shapiro_statistic": shapiro_stat,
+                "shapiro_p_value": shapiro_p,
+                "is_normal_distribution": shapiro_p > 0.05,
             }
         else:
             normality_test = {
-                'shapiro_statistic': None,
-                'shapiro_p_value': None,
-                'is_normal_distribution': None
+                "shapiro_statistic": None,
+                "shapiro_p_value": None,
+                "is_normal_distribution": None,
             }
-        
+
         # Confidence intervals
         if len(pnl_values) > 1:
             confidence_interval = stats.t.interval(
-                0.95, 
+                0.95,
                 len(pnl_values) - 1,
                 loc=np.mean(pnl_values),
-                scale=stats.sem(pnl_values)
+                scale=stats.sem(pnl_values),
             )
             ci_stats = {
-                'pnl_95_ci_lower': confidence_interval[0],
-                'pnl_95_ci_upper': confidence_interval[1]
+                "pnl_95_ci_lower": confidence_interval[0],
+                "pnl_95_ci_upper": confidence_interval[1],
             }
         else:
-            ci_stats = {'pnl_95_ci_lower': None, 'pnl_95_ci_upper': None}
-        
+            ci_stats = {"pnl_95_ci_lower": None, "pnl_95_ci_upper": None}
+
         return {
             **basic_stats,
             **distribution_stats,
             **holding_stats,
             **normality_test,
-            **ci_stats
+            **ci_stats,
         }
 
     def _calculate_risk_metrics(self, trades_df):
         """Calculate advanced risk metrics for trading performance"""
         if trades_df.empty:
             return {}
-        
-        pnl_values = trades_df['pnl'].values
-        pnl_pct_values = trades_df['pnl_pct'].values
-        
+
+        pnl_values = trades_df["pnl"].values
+        pnl_pct_values = trades_df["pnl_pct"].values
+
         # Sharpe Ratio (assuming risk-free rate of 0 for simplicity)
         if np.std(pnl_values) > 0:
             sharpe_ratio = np.mean(pnl_values) / np.std(pnl_values)
         else:
             sharpe_ratio = 0
-        
+
         # Sortino Ratio (downside deviation)
         negative_returns = pnl_values[pnl_values < 0]
         if len(negative_returns) > 0:
             downside_deviation = np.std(negative_returns)
-            sortino_ratio = np.mean(pnl_values) / downside_deviation if downside_deviation > 0 else 0
+            sortino_ratio = (
+                np.mean(pnl_values) / downside_deviation
+                if downside_deviation > 0
+                else 0
+            )
         else:
-            sortino_ratio = float('inf') if np.mean(pnl_values) > 0 else 0
+            sortino_ratio = float("inf") if np.mean(pnl_values) > 0 else 0
             downside_deviation = 0
-        
+
         # Maximum Drawdown
         cumulative_pnl = np.cumsum(pnl_values)
         running_max = np.maximum.accumulate(cumulative_pnl)
         drawdowns = cumulative_pnl - running_max
         max_drawdown = np.min(drawdowns)
-        
+
         # Value at Risk (VaR) at 95% confidence level
         var_95 = np.percentile(pnl_values, 5)
-        
+
         # Expected Shortfall (Conditional VaR)
-        expected_shortfall = np.mean(pnl_values[pnl_values <= var_95]) if len(pnl_values[pnl_values <= var_95]) > 0 else 0
-        
+        expected_shortfall = (
+            np.mean(pnl_values[pnl_values <= var_95])
+            if len(pnl_values[pnl_values <= var_95]) > 0
+            else 0
+        )
+
         # Calmar Ratio (annual return / max drawdown)
         if max_drawdown != 0:
-            calmar_ratio = (np.sum(pnl_values) * 252) / abs(max_drawdown)  # Assuming 252 trading days
+            calmar_ratio = (np.sum(pnl_values) * 252) / abs(
+                max_drawdown
+            )  # Assuming 252 trading days
         else:
-            calmar_ratio = float('inf') if np.sum(pnl_values) > 0 else 0
-        
+            calmar_ratio = float("inf") if np.sum(pnl_values) > 0 else 0
+
         # Kelly Criterion
         winning_trades = pnl_values[pnl_values > 0]
         losing_trades = pnl_values[pnl_values < 0]
-        
+
         if len(winning_trades) > 0 and len(losing_trades) > 0:
             win_rate = len(winning_trades) / len(pnl_values)
             avg_win = np.mean(winning_trades)
             avg_loss = abs(np.mean(losing_trades))
-            
+
             if avg_loss > 0:
                 kelly_criterion = win_rate - ((1 - win_rate) / (avg_win / avg_loss))
             else:
                 kelly_criterion = win_rate
         else:
             kelly_criterion = 0
-        
+
         # Ulcer Index (measure of downside risk)
         if len(cumulative_pnl) > 0:
             percentage_drawdowns = (drawdowns / running_max) * 100
             percentage_drawdowns = percentage_drawdowns[~np.isnan(percentage_drawdowns)]
-            ulcer_index = np.sqrt(np.mean(percentage_drawdowns ** 2)) if len(percentage_drawdowns) > 0 else 0
+            ulcer_index = (
+                np.sqrt(np.mean(percentage_drawdowns**2))
+                if len(percentage_drawdowns) > 0
+                else 0
+            )
         else:
             ulcer_index = 0
-        
+
         return {
-            'sharpe_ratio': sharpe_ratio,
-            'sortino_ratio': sortino_ratio,
-            'max_drawdown': max_drawdown,
-            'downside_deviation': downside_deviation,
-            'var_95': var_95,
-            'expected_shortfall': expected_shortfall,
-            'calmar_ratio': calmar_ratio,
-            'kelly_criterion': kelly_criterion,
-            'ulcer_index': ulcer_index,
-            'volatility': np.std(pnl_values),
-            'return_variance': np.var(pnl_values)
+            "sharpe_ratio": sharpe_ratio,
+            "sortino_ratio": sortino_ratio,
+            "max_drawdown": max_drawdown,
+            "downside_deviation": downside_deviation,
+            "var_95": var_95,
+            "expected_shortfall": expected_shortfall,
+            "calmar_ratio": calmar_ratio,
+            "kelly_criterion": kelly_criterion,
+            "ulcer_index": ulcer_index,
+            "volatility": np.std(pnl_values),
+            "return_variance": np.var(pnl_values),
         }
 
     def _analyze_trading_psychology(self, trades_df):
         """Analyze trading psychology and behavioral patterns"""
         if trades_df.empty:
             return {}
-        
-        pnl_values = trades_df['pnl'].values
-        
+
+        pnl_values = trades_df["pnl"].values
+
         # Consecutive wins/losses analysis
         consecutive_patterns = self._analyze_consecutive_patterns(pnl_values)
-        
+
         # Trade timing patterns
         timing_patterns = self._analyze_timing_patterns(trades_df)
-        
+
         # Overtrading analysis
         overtrading_metrics = self._analyze_overtrading(trades_df)
-        
+
         # Revenge trading detection
         revenge_trading = self._detect_revenge_trading(trades_df)
-        
+
         return {
             **consecutive_patterns,
             **timing_patterns,
             **overtrading_metrics,
-            **revenge_trading
+            **revenge_trading,
         }
 
     def _analyze_consecutive_patterns(self, pnl_values):
         """Analyze consecutive wins and losses"""
         if len(pnl_values) == 0:
             return {}
-        
+
         # Convert to win/loss sequence
-        win_loss_sequence = ['W' if pnl > 0 else 'L' if pnl < 0 else 'B' for pnl in pnl_values]
-        
+        win_loss_sequence = [
+            "W" if pnl > 0 else "L" if pnl < 0 else "B" for pnl in pnl_values
+        ]
+
         # Find consecutive patterns
         current_streak = 1
         current_type = win_loss_sequence[0]
@@ -554,551 +595,748 @@ class MarketCloseReportGenerator:
         max_loss_streak = 0
         current_win_streak = 0
         current_loss_streak = 0
-        
+
         for i in range(1, len(win_loss_sequence)):
             if win_loss_sequence[i] == current_type:
                 current_streak += 1
             else:
                 # Update max streaks
-                if current_type == 'W':
+                if current_type == "W":
                     max_win_streak = max(max_win_streak, current_streak)
-                elif current_type == 'L':
+                elif current_type == "L":
                     max_loss_streak = max(max_loss_streak, current_streak)
-                
+
                 # Reset for new streak
                 current_streak = 1
                 current_type = win_loss_sequence[i]
-        
+
         # Check final streak
-        if current_type == 'W':
+        if current_type == "W":
             max_win_streak = max(max_win_streak, current_streak)
-        elif current_type == 'L':
+        elif current_type == "L":
             max_loss_streak = max(max_loss_streak, current_streak)
-        
+
         return {
-            'max_consecutive_wins': max_win_streak,
-            'max_consecutive_losses': max_loss_streak,
-            'current_streak_type': current_type,
-            'current_streak_length': current_streak
+            "max_consecutive_wins": max_win_streak,
+            "max_consecutive_losses": max_loss_streak,
+            "current_streak_type": current_type,
+            "current_streak_length": current_streak,
         }
 
     def _analyze_timing_patterns(self, trades_df):
         """Analyze timing patterns in trading"""
         if trades_df.empty:
             return {}
-        
+
         # Average time between trades
         if len(trades_df) > 1:
-            time_diffs = trades_df['entry_time'].diff().dropna()
+            time_diffs = trades_df["entry_time"].diff().dropna()
             avg_time_between_trades = time_diffs.mean().total_seconds() / 60  # minutes
         else:
             avg_time_between_trades = 0
-        
+
         # Trade frequency by hour
-        hourly_frequency = trades_df.groupby('entry_hour').size().to_dict()
-        most_active_hour = max(hourly_frequency, key=hourly_frequency.get) if hourly_frequency else 0
-        
+        hourly_frequency = trades_df.groupby("entry_hour").size().to_dict()
+        most_active_hour = (
+            max(hourly_frequency, key=hourly_frequency.get) if hourly_frequency else 0
+        )
+
         return {
-            'avg_time_between_trades_minutes': avg_time_between_trades,
-            'most_active_trading_hour': most_active_hour,
-            'hourly_trade_frequency': hourly_frequency
+            "avg_time_between_trades_minutes": avg_time_between_trades,
+            "most_active_trading_hour": most_active_hour,
+            "hourly_trade_frequency": hourly_frequency,
         }
 
     def _analyze_overtrading(self, trades_df):
         """Detect signs of overtrading"""
         if trades_df.empty:
             return {}
-        
+
         # Calculate trading frequency metrics
         total_trades = len(trades_df)
-        unique_symbols = trades_df['symbol'].nunique()
-        
+        unique_symbols = trades_df["symbol"].nunique()
+
         # Trades per symbol ratio
         trades_per_symbol = total_trades / unique_symbols if unique_symbols > 0 else 0
-        
+
         # Rapid fire trading (trades within 5 minutes)
         rapid_trades = 0
         if len(trades_df) > 1:
             for i in range(1, len(trades_df)):
-                time_diff = (trades_df.iloc[i]['entry_time'] - trades_df.iloc[i-1]['entry_time']).total_seconds() / 60
+                time_diff = (
+                    trades_df.iloc[i]["entry_time"]
+                    - trades_df.iloc[i - 1]["entry_time"]
+                ).total_seconds() / 60
                 if time_diff < 5:
                     rapid_trades += 1
-        
+
         rapid_trade_ratio = rapid_trades / total_trades if total_trades > 0 else 0
-        
+
         return {
-            'trades_per_symbol_ratio': trades_per_symbol,
-            'rapid_fire_trades': rapid_trades,
-            'rapid_trade_ratio': rapid_trade_ratio,
-            'potential_overtrading': rapid_trade_ratio > 0.3  # Flag if >30% of trades are rapid
+            "trades_per_symbol_ratio": trades_per_symbol,
+            "rapid_fire_trades": rapid_trades,
+            "rapid_trade_ratio": rapid_trade_ratio,
+            "potential_overtrading": rapid_trade_ratio
+            > 0.3,  # Flag if >30% of trades are rapid
         }
 
     def _detect_revenge_trading(self, trades_df):
         """Detect potential revenge trading patterns"""
         if trades_df.empty or len(trades_df) < 2:
-            return {'revenge_trading_detected': False}
-        
+            return {"revenge_trading_detected": False}
+
         revenge_indicators = 0
-        
+
         # Check for increasing position sizes after losses
         for i in range(1, len(trades_df)):
-            prev_trade = trades_df.iloc[i-1]
+            prev_trade = trades_df.iloc[i - 1]
             current_trade = trades_df.iloc[i]
-            
+
             # If previous trade was a loss and current trade has larger size
-            if prev_trade['pnl'] < 0 and current_trade['trade_value'] > prev_trade['trade_value'] * 1.5:
+            if (
+                prev_trade["pnl"] < 0
+                and current_trade["trade_value"] > prev_trade["trade_value"] * 1.5
+            ):
                 revenge_indicators += 1
-        
-        revenge_ratio = revenge_indicators / (len(trades_df) - 1) if len(trades_df) > 1 else 0
-        
+
+        revenge_ratio = (
+            revenge_indicators / (len(trades_df) - 1) if len(trades_df) > 1 else 0
+        )
+
         return {
-            'revenge_trading_detected': revenge_ratio > 0.2,
-            'revenge_trade_indicators': revenge_indicators,
-            'revenge_trading_ratio': revenge_ratio
+            "revenge_trading_detected": revenge_ratio > 0.2,
+            "revenge_trade_indicators": revenge_indicators,
+            "revenge_trading_ratio": revenge_ratio,
         }
 
-    def _generate_recommendations(self, symbol_analysis, time_analysis, side_analysis, statistical_analysis=None, risk_metrics=None):
+    def _generate_recommendations(
+        self,
+        symbol_analysis,
+        time_analysis,
+        side_analysis,
+        statistical_analysis=None,
+        risk_metrics=None,
+    ):
         """Generate trading recommendations based on analysis"""
         recommendations = []
-        
+
         # Symbol recommendations
-        best_symbols = sorted(symbol_analysis.items(), 
-                            key=lambda x: x[1]['pnl'], reverse=True)[:3]
-        worst_symbols = sorted(symbol_analysis.items(), 
-                             key=lambda x: x[1]['pnl'])[:3]
-        
+        best_symbols = sorted(
+            symbol_analysis.items(), key=lambda x: x[1]["pnl"], reverse=True
+        )[:3]
+        worst_symbols = sorted(symbol_analysis.items(), key=lambda x: x[1]["pnl"])[:3]
+
         if best_symbols:
-            recommendations.append({
-                'type': 'Best Performers',
-                'recommendation': f"Continue focusing on {', '.join([s[0] for s in best_symbols])}",
-                'rationale': "These symbols showed strong profitability today",
-                'data': best_symbols
-            })
-        
-        if worst_symbols and worst_symbols[0][1]['pnl'] < 0:
-            recommendations.append({
-                'type': 'Avoid/Review',
-                'recommendation': f"Review strategy for {', '.join([s[0] for s in worst_symbols if s[1]['pnl'] < 0])}",
-                'rationale': "These symbols resulted in losses",
-                'data': worst_symbols
-            })
-        
+            recommendations.append(
+                {
+                    "type": "Best Performers",
+                    "recommendation": f"Continue focusing on {', '.join([s[0] for s in best_symbols])}",
+                    "rationale": "These symbols showed strong profitability today",
+                    "data": best_symbols,
+                }
+            )
+
+        if worst_symbols and worst_symbols[0][1]["pnl"] < 0:
+            recommendations.append(
+                {
+                    "type": "Avoid/Review",
+                    "recommendation": f"Review strategy for {', '.join([s[0] for s in worst_symbols if s[1]['pnl'] < 0])}",
+                    "rationale": "These symbols resulted in losses",
+                    "data": worst_symbols,
+                }
+            )
+
         # Time-based recommendations
-        best_hours = sorted(time_analysis.items(), 
-                          key=lambda x: x[1]['pnl'], reverse=True)[:2]
-        
+        best_hours = sorted(
+            time_analysis.items(), key=lambda x: x[1]["pnl"], reverse=True
+        )[:2]
+
         if best_hours:
-            recommendations.append({
-                'type': 'Optimal Trading Times',
-                'recommendation': f"Focus trading between {best_hours[0][0]}:00-{best_hours[0][0]+1}:00",
-                'rationale': f"Most profitable hour with ${best_hours[0][1]['pnl']:.2f} P&L",
-                'data': best_hours
-            })
-        
+            recommendations.append(
+                {
+                    "type": "Optimal Trading Times",
+                    "recommendation": f"Focus trading between {best_hours[0][0]}:00-{best_hours[0][0]+1}:00",
+                    "rationale": f"Most profitable hour with ${best_hours[0][1]['pnl']:.2f} P&L",
+                    "data": best_hours,
+                }
+            )
+
         # Statistical analysis recommendations
         if statistical_analysis:
-            win_rate = statistical_analysis.get('win_rate', 0)
-            profit_factor = statistical_analysis.get('profit_factor', 0)
-            
+            win_rate = statistical_analysis.get("win_rate", 0)
+            profit_factor = statistical_analysis.get("profit_factor", 0)
+
             if win_rate < 40:
-                recommendations.append({
-                    'type': 'Strategy Improvement',
-                    'recommendation': f"Win rate of {win_rate:.1f}% is below optimal - review entry criteria",
-                    'rationale': "Target win rate should be above 45% for scalping strategies",
-                    'data': {'current_win_rate': win_rate, 'target_win_rate': 45}
-                })
-            
+                recommendations.append(
+                    {
+                        "type": "Strategy Improvement",
+                        "recommendation": f"Win rate of {win_rate:.1f}% is below optimal - review entry criteria",
+                        "rationale": "Target win rate should be above 45% for scalping strategies",
+                        "data": {"current_win_rate": win_rate, "target_win_rate": 45},
+                    }
+                )
+
             if profit_factor < 1.2:
-                recommendations.append({
-                    'type': 'Risk Management',
-                    'recommendation': f"Profit factor of {profit_factor:.2f} indicates poor risk/reward - tighten stops",
-                    'rationale': "Profit factor should be above 1.5 for sustainable trading",
-                    'data': {'current_pf': profit_factor, 'target_pf': 1.5}
-                })
-        
+                recommendations.append(
+                    {
+                        "type": "Risk Management",
+                        "recommendation": f"Profit factor of {profit_factor:.2f} indicates poor risk/reward - tighten stops",
+                        "rationale": "Profit factor should be above 1.5 for sustainable trading",
+                        "data": {"current_pf": profit_factor, "target_pf": 1.5},
+                    }
+                )
+
         # Risk metrics recommendations
         if risk_metrics:
-            sharpe_ratio = risk_metrics.get('sharpe_ratio', 0)
-            max_drawdown = risk_metrics.get('max_drawdown', 0)
-            
+            sharpe_ratio = risk_metrics.get("sharpe_ratio", 0)
+            max_drawdown = risk_metrics.get("max_drawdown", 0)
+
             if sharpe_ratio < 1.0:
-                recommendations.append({
-                    'type': 'Risk-Adjusted Returns',
-                    'recommendation': f"Sharpe ratio of {sharpe_ratio:.2f} indicates room for improvement",
-                    'rationale': "Target Sharpe ratio above 1.5 for good performance",
-                    'data': {'current_sharpe': sharpe_ratio, 'target_sharpe': 1.5}
-                })
-            
+                recommendations.append(
+                    {
+                        "type": "Risk-Adjusted Returns",
+                        "recommendation": f"Sharpe ratio of {sharpe_ratio:.2f} indicates room for improvement",
+                        "rationale": "Target Sharpe ratio above 1.5 for good performance",
+                        "data": {"current_sharpe": sharpe_ratio, "target_sharpe": 1.5},
+                    }
+                )
+
             if abs(max_drawdown) > 100:
-                recommendations.append({
-                    'type': 'Drawdown Management',
-                    'recommendation': f"Maximum drawdown of ${max_drawdown:.2f} is excessive",
-                    'rationale': "Consider reducing position sizes or implementing better stops",
-                    'data': {'max_dd': max_drawdown, 'recommended_max': -50}
-                })
-        
+                recommendations.append(
+                    {
+                        "type": "Drawdown Management",
+                        "recommendation": f"Maximum drawdown of ${max_drawdown:.2f} is excessive",
+                        "rationale": "Consider reducing position sizes or implementing better stops",
+                        "data": {"max_dd": max_drawdown, "recommended_max": -50},
+                    }
+                )
+
         # Position sizing recommendations
-        avg_trade_size = np.mean([s['avg_trade_size'] for s in time_analysis.values() if 'avg_trade_size' in s])
+        avg_trade_size = np.mean(
+            [
+                s["avg_trade_size"]
+                for s in time_analysis.values()
+                if "avg_trade_size" in s
+            ]
+        )
         if avg_trade_size:
-            recommendations.append({
-                'type': 'Position Sizing',
-                'recommendation': f"Consider optimal position size around ${avg_trade_size:.2f}",
-                'rationale': "Based on average successful trade size",
-                'data': {'avg_size': avg_trade_size}
-            })
-        
+            recommendations.append(
+                {
+                    "type": "Position Sizing",
+                    "recommendation": f"Consider optimal position size around ${avg_trade_size:.2f}",
+                    "rationale": "Based on average successful trade size",
+                    "data": {"avg_size": avg_trade_size},
+                }
+            )
+
         return recommendations
 
     def _get_trade_summary(self, df):
         """Get overall trade summary"""
         if df.empty:
             return {}
-        
+
         return {
-            'total_trades': len(df),
-            'total_volume': df['value'].sum(),
-            'unique_symbols': df['symbol'].nunique(),
-            'buy_orders': len(df[df['side'] == 'buy']),
-            'sell_orders': len(df[df['side'] == 'sell']),
-            'first_trade': df['filled_at'].min(),
-            'last_trade': df['filled_at'].max(),
-            'trading_span_hours': (df['filled_at'].max() - df['filled_at'].min()).total_seconds() / 3600
+            "total_trades": len(df),
+            "total_volume": df["value"].sum(),
+            "unique_symbols": df["symbol"].nunique(),
+            "buy_orders": len(df[df["side"] == "buy"]),
+            "sell_orders": len(df[df["side"] == "sell"]),
+            "first_trade": df["filled_at"].min(),
+            "last_trade": df["filled_at"].max(),
+            "trading_span_hours": (
+                df["filled_at"].max() - df["filled_at"].min()
+            ).total_seconds()
+            / 3600,
         }
 
     def create_charts(self, analysis_data):
         """Create comprehensive visualization charts including statistical analysis"""
-        
-        if analysis_data['raw_data'].empty:
+
+        if analysis_data["raw_data"].empty:
             return None, None
-        
-        df = analysis_data['raw_data']
-        trades_df = analysis_data.get('trades_data', pd.DataFrame())
-        
+
+        df = analysis_data["raw_data"]
+        trades_df = analysis_data.get("trades_data", pd.DataFrame())
+
         # Create main trading charts
         main_chart_path = self._create_main_trading_charts(analysis_data)
-        
+
         # Create statistical analysis charts if we have completed trades
         stats_chart_path = None
         if not trades_df.empty:
             stats_chart_path = self._create_statistical_charts(trades_df, analysis_data)
-        
+
         return main_chart_path, stats_chart_path
 
     def _create_main_trading_charts(self, analysis_data):
         """Create main trading performance charts"""
-        df = analysis_data['raw_data']
-        trades_df = analysis_data.get('trades_data', pd.DataFrame())
-        
+        df = analysis_data["raw_data"]
+        trades_df = analysis_data.get("trades_data", pd.DataFrame())
+
         # Create figure with subplots - add equity curve as 5th chart
         fig = plt.figure(figsize=(20, 16))
         gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
-        
-        fig.suptitle(f'Trading Analysis - {self.today.strftime("%B %d, %Y")}', fontsize=16, fontweight='bold')
-        
+
+        fig.suptitle(
+            f'Trading Analysis - {self.today.strftime("%B %d, %Y")}',
+            fontsize=16,
+            fontweight="bold",
+        )
+
         # Chart 1: Trading Volume by Hour
         ax1 = fig.add_subplot(gs[0, 0])
-        hourly_data = analysis_data['time_analysis']
+        hourly_data = analysis_data["time_analysis"]
         if hourly_data:
             hours = list(hourly_data.keys())
-            volumes = [hourly_data[h]['volume'] for h in hours]
-            
-            bars1 = ax1.bar(hours, volumes, color='steelblue', alpha=0.7)
-            ax1.set_title('Dollar Volume Traded by Hour', fontweight='bold')
-            ax1.set_xlabel('Hour of Day')
-            ax1.set_ylabel('Dollar Volume ($)')
-            ax1.tick_params(axis='x', rotation=45)
-            
+            volumes = [hourly_data[h]["volume"] for h in hours]
+
+            bars1 = ax1.bar(hours, volumes, color="steelblue", alpha=0.7)
+            ax1.set_title("Dollar Volume Traded by Hour", fontweight="bold")
+            ax1.set_xlabel("Hour of Day")
+            ax1.set_ylabel("Dollar Volume ($)")
+            ax1.tick_params(axis="x", rotation=45)
+
             # Add value labels on bars
             for bar, vol in zip(bars1, volumes):
                 height = bar.get_height()
-                ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                        f'${vol:,.0f}', ha='center', va='bottom', fontsize=8)
-        
+                ax1.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    height + height * 0.01,
+                    f"${vol:,.0f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                )
+
         # Chart 2: P&L by Symbol
         ax2 = fig.add_subplot(gs[0, 1])
-        symbol_data = analysis_data['symbol_performance']
+        symbol_data = analysis_data["symbol_performance"]
         if symbol_data:
             symbols = list(symbol_data.keys())
-            pnls = [symbol_data[s]['pnl'] for s in symbols]
-            colors = ['green' if pnl >= 0 else 'red' for pnl in pnls]
-            
+            pnls = [symbol_data[s]["pnl"] for s in symbols]
+            colors = ["green" if pnl >= 0 else "red" for pnl in pnls]
+
             bars2 = ax2.barh(symbols, pnls, color=colors, alpha=0.7)
-            ax2.set_title('P&L by Symbol', fontweight='bold')
-            ax2.set_xlabel('P&L ($)')
-            ax2.axvline(x=0, color='black', linestyle='-', alpha=0.3)
-            
+            ax2.set_title("P&L by Symbol", fontweight="bold")
+            ax2.set_xlabel("P&L ($)")
+            ax2.axvline(x=0, color="black", linestyle="-", alpha=0.3)
+
             # Add value labels
             for bar, pnl in zip(bars2, pnls):
                 width = bar.get_width()
-                ax2.text(width + (abs(width)*0.02 if width >= 0 else -abs(width)*0.02), 
-                        bar.get_y() + bar.get_height()/2.,
-                        f'${pnl:.2f}', ha='left' if width >= 0 else 'right', 
-                        va='center', fontsize=8)
-        
+                ax2.text(
+                    width + (abs(width) * 0.02 if width >= 0 else -abs(width) * 0.02),
+                    bar.get_y() + bar.get_height() / 2.0,
+                    f"${pnl:.2f}",
+                    ha="left" if width >= 0 else "right",
+                    va="center",
+                    fontsize=8,
+                )
+
         # Chart 3: Trading Activity Timeline
         ax3 = fig.add_subplot(gs[1, 0])
         if not df.empty:
-            df_sorted = df.sort_values('filled_at')
-            cumulative_volume = df_sorted['value'].cumsum()
-            
-            ax3.plot(df_sorted['filled_at'], cumulative_volume, color='purple', linewidth=2)
-            ax3.set_title('Cumulative Dollar Volume Timeline', fontweight='bold')
-            ax3.set_xlabel('Time')
-            ax3.set_ylabel('Cumulative Dollar Volume ($)')
-            ax3.tick_params(axis='x', rotation=45)
-            
+            df_sorted = df.sort_values("filled_at")
+            cumulative_volume = df_sorted["value"].cumsum()
+
+            ax3.plot(
+                df_sorted["filled_at"], cumulative_volume, color="purple", linewidth=2
+            )
+            ax3.set_title("Cumulative Dollar Volume Timeline", fontweight="bold")
+            ax3.set_xlabel("Time")
+            ax3.set_ylabel("Cumulative Dollar Volume ($)")
+            ax3.tick_params(axis="x", rotation=45)
+
             # Format x-axis for better readability
-            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+
         # Chart 4: Buy vs Sell Distribution
         ax4 = fig.add_subplot(gs[1, 1])
         if not df.empty:
-            buy_vol = df[df['side'] == 'buy']['value'].sum()
-            sell_vol = df[df['side'] == 'sell']['value'].sum()
-            
-            ax4.pie([buy_vol, sell_vol], labels=['Buy Orders', 'Sell Orders'], 
-                   colors=['lightgreen', 'lightcoral'], autopct='%1.1f%%',
-                   startangle=90)
-            ax4.set_title('Buy vs Sell Dollar Volume Distribution', fontweight='bold')
-        
+            buy_vol = df[df["side"] == "buy"]["value"].sum()
+            sell_vol = df[df["side"] == "sell"]["value"].sum()
+
+            ax4.pie(
+                [buy_vol, sell_vol],
+                labels=["Buy Orders", "Sell Orders"],
+                colors=["lightgreen", "lightcoral"],
+                autopct="%1.1f%%",
+                startangle=90,
+            )
+            ax4.set_title("Buy vs Sell Dollar Volume Distribution", fontweight="bold")
+
         # Chart 5: Equity Curve (spans both columns in bottom row)
         ax5 = fig.add_subplot(gs[2, :])
         if not trades_df.empty:
             # Calculate cumulative P&L and drawdown
-            cumulative_pnl = trades_df['pnl'].cumsum()
+            cumulative_pnl = trades_df["pnl"].cumsum()
             running_max = cumulative_pnl.expanding().max()
             drawdown = cumulative_pnl - running_max
-            
+
             # Plot equity curve
-            ax5.plot(range(len(cumulative_pnl)), cumulative_pnl, 'b-', linewidth=3, label='Cumulative P&L', alpha=0.8)
-            ax5.plot(range(len(running_max)), running_max, 'g--', alpha=0.7, linewidth=2, label='Running Maximum')
-            ax5.fill_between(range(len(cumulative_pnl)), cumulative_pnl, running_max, 
-                            alpha=0.3, color='red', label='Drawdown')
-            
-            ax5.set_xlabel('Trade Number')
-            ax5.set_ylabel('Cumulative P&L ($)')
-            ax5.set_title('📈 Equity Curve - Your Trading Performance Over Time', fontweight='bold', fontsize=14)
+            ax5.plot(
+                range(len(cumulative_pnl)),
+                cumulative_pnl,
+                "b-",
+                linewidth=3,
+                label="Cumulative P&L",
+                alpha=0.8,
+            )
+            ax5.plot(
+                range(len(running_max)),
+                running_max,
+                "g--",
+                alpha=0.7,
+                linewidth=2,
+                label="Running Maximum",
+            )
+            ax5.fill_between(
+                range(len(cumulative_pnl)),
+                cumulative_pnl,
+                running_max,
+                alpha=0.3,
+                color="red",
+                label="Drawdown",
+            )
+
+            ax5.set_xlabel("Trade Number")
+            ax5.set_ylabel("Cumulative P&L ($)")
+            ax5.set_title(
+                "📈 Equity Curve - Your Trading Performance Over Time",
+                fontweight="bold",
+                fontsize=14,
+            )
             ax5.legend()
             ax5.grid(True, alpha=0.3)
-            
+
             # Add key statistics as text
             total_return = cumulative_pnl.iloc[-1] if len(cumulative_pnl) > 0 else 0
             max_dd = drawdown.min() if len(drawdown) > 0 else 0
-            win_rate = len(trades_df[trades_df['pnl'] > 0]) / len(trades_df) * 100 if len(trades_df) > 0 else 0
-            
-            stats_text = f'Total Return: ${total_return:.2f} | Max Drawdown: ${max_dd:.2f} | Win Rate: {win_rate:.1f}%'
-            ax5.text(0.02, 0.98, stats_text, transform=ax5.transAxes, fontsize=11, 
-                    verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
+            win_rate = (
+                len(trades_df[trades_df["pnl"] > 0]) / len(trades_df) * 100
+                if len(trades_df) > 0
+                else 0
+            )
+
+            stats_text = f"Total Return: ${total_return:.2f} | Max Drawdown: ${max_dd:.2f} | Win Rate: {win_rate:.1f}%"
+            ax5.text(
+                0.02,
+                0.98,
+                stats_text,
+                transform=ax5.transAxes,
+                fontsize=11,
+                verticalalignment="top",
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8),
+            )
         else:
             # No completed trades yet
-            ax5.text(0.5, 0.5, 'No completed trades yet\nEquity curve will appear as trades are completed', 
-                    ha='center', va='center', transform=ax5.transAxes, fontsize=14, 
-                    bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
-            ax5.set_title('📈 Equity Curve - Your Trading Performance Over Time', fontweight='bold', fontsize=14)
-            ax5.set_xlabel('Trade Number')
-            ax5.set_ylabel('Cumulative P&L ($)')
-        
+            ax5.text(
+                0.5,
+                0.5,
+                "No completed trades yet\nEquity curve will appear as trades are completed",
+                ha="center",
+                va="center",
+                transform=ax5.transAxes,
+                fontsize=14,
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8),
+            )
+            ax5.set_title(
+                "📈 Equity Curve - Your Trading Performance Over Time",
+                fontweight="bold",
+                fontsize=14,
+            )
+            ax5.set_xlabel("Trade Number")
+            ax5.set_ylabel("Cumulative P&L ($)")
+
         plt.tight_layout()
-        
+
         # Save chart
-        chart_path = self.reports_dir / f"trading_analysis_charts_{self.today.strftime('%Y%m%d')}.png"
-        plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+        chart_path = (
+            self.reports_dir
+            / f"trading_analysis_charts_{self.today.strftime('%Y%m%d')}.png"
+        )
+        plt.savefig(chart_path, dpi=300, bbox_inches="tight")
         plt.close()
-        
+
         return str(chart_path)
 
     def _create_statistical_charts(self, trades_df, analysis_data):
         """Create comprehensive statistical analysis charts"""
-        
+
         # Create a large figure with multiple subplots for statistical analysis
         fig = plt.figure(figsize=(20, 24))
         gs = fig.add_gridspec(6, 3, hspace=0.5, wspace=0.4)
-        
-        fig.suptitle(f'Statistical Trading Analysis - {self.today.strftime("%B %d, %Y")}', 
-                    fontsize=20, fontweight='bold', y=0.98)
-        
+
+        fig.suptitle(
+            f'Statistical Trading Analysis - {self.today.strftime("%B %d, %Y")}',
+            fontsize=20,
+            fontweight="bold",
+            y=0.98,
+        )
+
         # Get statistical data
-        stats = analysis_data.get('statistical_analysis', {})
-        risk_metrics = analysis_data.get('risk_metrics', {})
-        psychology = analysis_data.get('trading_psychology', {})
-        
+        stats = analysis_data.get("statistical_analysis", {})
+        risk_metrics = analysis_data.get("risk_metrics", {})
+        psychology = analysis_data.get("trading_psychology", {})
+
         # 1. P&L Distribution (Row 1, Col 1-2)
         ax1 = fig.add_subplot(gs[0, :2])
-        pnl_values = trades_df['pnl'].values
-        n_bins = min(20, len(pnl_values) // 2) if len(pnl_values) > 10 else len(pnl_values)
-        ax1.hist(pnl_values, bins=n_bins, alpha=0.7, color='skyblue', edgecolor='black', density=True)
-        ax1.axvline(np.mean(pnl_values), color='red', linestyle='--', linewidth=2, 
-                   label=f'Mean: ${np.mean(pnl_values):.2f}')
-        ax1.axvline(np.median(pnl_values), color='green', linestyle='--', linewidth=2,
-                   label=f'Median: ${np.median(pnl_values):.2f}')
-        
+        pnl_values = trades_df["pnl"].values
+        n_bins = (
+            min(20, len(pnl_values) // 2) if len(pnl_values) > 10 else len(pnl_values)
+        )
+        ax1.hist(
+            pnl_values,
+            bins=n_bins,
+            alpha=0.7,
+            color="skyblue",
+            edgecolor="black",
+            density=True,
+        )
+        ax1.axvline(
+            np.mean(pnl_values),
+            color="red",
+            linestyle="--",
+            linewidth=2,
+            label=f"Mean: ${np.mean(pnl_values):.2f}",
+        )
+        ax1.axvline(
+            np.median(pnl_values),
+            color="green",
+            linestyle="--",
+            linewidth=2,
+            label=f"Median: ${np.median(pnl_values):.2f}",
+        )
+
         # Add normal distribution overlay if data is sufficient
         if len(pnl_values) > 5:
             x = np.linspace(pnl_values.min(), pnl_values.max(), 100)
             from scipy.stats import norm
+
             y = norm.pdf(x, np.mean(pnl_values), np.std(pnl_values))
-            ax1.plot(x, y, 'orange', linewidth=2, label='Normal Distribution')
-        
-        ax1.set_xlabel('P&L ($)')
-        ax1.set_ylabel('Density')
-        ax1.set_title('P&L Distribution Analysis', fontweight='bold', fontsize=14)
+            ax1.plot(x, y, "orange", linewidth=2, label="Normal Distribution")
+
+        ax1.set_xlabel("P&L ($)")
+        ax1.set_ylabel("Density")
+        ax1.set_title("P&L Distribution Analysis", fontweight="bold", fontsize=14)
         ax1.legend()
         ax1.grid(True, alpha=0.3)
-        
+
         # 2. Box Plot (Row 1, Col 3)
         ax2 = fig.add_subplot(gs[0, 2])
         box_plot = ax2.boxplot(pnl_values, vert=True, patch_artist=True)
-        box_plot['boxes'][0].set_facecolor('lightblue')
-        ax2.set_ylabel('P&L ($)')
-        ax2.set_title('P&L Box Plot', fontweight='bold', fontsize=14)
+        box_plot["boxes"][0].set_facecolor("lightblue")
+        ax2.set_ylabel("P&L ($)")
+        ax2.set_title("P&L Box Plot", fontweight="bold", fontsize=14)
         ax2.grid(True, alpha=0.3)
-        
+
         # 3. Equity Curve and Drawdown (Row 2, spans all columns)
-        cumulative_pnl = trades_df['pnl'].cumsum()
+        cumulative_pnl = trades_df["pnl"].cumsum()
         running_max = cumulative_pnl.expanding().max()
         drawdown = cumulative_pnl - running_max
-        
+
         ax3 = fig.add_subplot(gs[1, :])
-        ax3.plot(range(len(cumulative_pnl)), cumulative_pnl, 'b-', linewidth=2, label='Cumulative P&L')
-        ax3.plot(range(len(running_max)), running_max, 'g--', alpha=0.7, label='Running Maximum')
-        ax3.fill_between(range(len(cumulative_pnl)), cumulative_pnl, running_max, 
-                        alpha=0.3, color='red', label='Drawdown')
-        ax3.set_xlabel('Trade Number')
-        ax3.set_ylabel('Cumulative P&L ($)')
-        ax3.set_title('Equity Curve with Drawdowns', fontweight='bold', fontsize=14)
+        ax3.plot(
+            range(len(cumulative_pnl)),
+            cumulative_pnl,
+            "b-",
+            linewidth=2,
+            label="Cumulative P&L",
+        )
+        ax3.plot(
+            range(len(running_max)),
+            running_max,
+            "g--",
+            alpha=0.7,
+            label="Running Maximum",
+        )
+        ax3.fill_between(
+            range(len(cumulative_pnl)),
+            cumulative_pnl,
+            running_max,
+            alpha=0.3,
+            color="red",
+            label="Drawdown",
+        )
+        ax3.set_xlabel("Trade Number")
+        ax3.set_ylabel("Cumulative P&L ($)")
+        ax3.set_title("Equity Curve with Drawdowns", fontweight="bold", fontsize=14)
         ax3.legend()
         ax3.grid(True, alpha=0.3)
-        
+
         # 4. Risk Metrics (Row 3, Col 1)
         ax4 = fig.add_subplot(gs[2, 0])
-        risk_names = ['Sharpe\nRatio', 'Sortino\nRatio', 'Calmar\nRatio']
+        risk_names = ["Sharpe\nRatio", "Sortino\nRatio", "Calmar\nRatio"]
         risk_values = [
-            risk_metrics.get('sharpe_ratio', 0),
-            risk_metrics.get('sortino_ratio', 0),
-            risk_metrics.get('calmar_ratio', 0)
+            risk_metrics.get("sharpe_ratio", 0),
+            risk_metrics.get("sortino_ratio", 0),
+            risk_metrics.get("calmar_ratio", 0),
         ]
         # Cap extreme values for visualization
         risk_values = [min(max(v, -5), 5) for v in risk_values]
-        colors = ['green' if v > 0 else 'red' for v in risk_values]
-        
+        colors = ["green" if v > 0 else "red" for v in risk_values]
+
         bars = ax4.bar(risk_names, risk_values, color=colors, alpha=0.7)
-        ax4.set_title('Risk-Adjusted Returns', fontweight='bold', fontsize=12)
-        ax4.set_ylabel('Ratio')
+        ax4.set_title("Risk-Adjusted Returns", fontweight="bold", fontsize=12)
+        ax4.set_ylabel("Ratio")
         ax4.grid(True, alpha=0.3)
-        ax4.axhline(y=0, color='black', linestyle='-', alpha=0.5)
-        
+        ax4.axhline(y=0, color="black", linestyle="-", alpha=0.5)
+
         # Add value labels
         for bar, val in zip(bars, risk_values):
             height = bar.get_height()
-            ax4.text(bar.get_x() + bar.get_width()/2., height + (0.1 if height >= 0 else -0.1),
-                    f'{val:.2f}', ha='center', va='bottom' if height >= 0 else 'top', fontsize=10)
-        
+            ax4.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height + (0.1 if height >= 0 else -0.1),
+                f"{val:.2f}",
+                ha="center",
+                va="bottom" if height >= 0 else "top",
+                fontsize=10,
+            )
+
         # 5. Risk Metrics Values (Row 3, Col 2)
         ax5 = fig.add_subplot(gs[2, 1])
-        risk_names2 = ['Max\nDrawdown', 'VaR 95%', 'Expected\nShortfall']
+        risk_names2 = ["Max\nDrawdown", "VaR 95%", "Expected\nShortfall"]
         risk_values2 = [
-            risk_metrics.get('max_drawdown', 0),
-            risk_metrics.get('var_95', 0),
-            risk_metrics.get('expected_shortfall', 0)
+            risk_metrics.get("max_drawdown", 0),
+            risk_metrics.get("var_95", 0),
+            risk_metrics.get("expected_shortfall", 0),
         ]
-        
-        bars2 = ax5.bar(risk_names2, risk_values2, color='orange', alpha=0.7)
-        ax5.set_title('Risk Metrics ($)', fontweight='bold', fontsize=12)
-        ax5.set_ylabel('Value ($)')
+
+        bars2 = ax5.bar(risk_names2, risk_values2, color="orange", alpha=0.7)
+        ax5.set_title("Risk Metrics ($)", fontweight="bold", fontsize=12)
+        ax5.set_ylabel("Value ($)")
         ax5.grid(True, alpha=0.3)
-        
+
         # Add value labels
         for bar, val in zip(bars2, risk_values2):
             height = bar.get_height()
-            ax5.text(bar.get_x() + bar.get_width()/2., height + (abs(height)*0.02 if height >= 0 else -abs(height)*0.02),
-                    f'${val:.2f}', ha='center', va='bottom' if height >= 0 else 'top', fontsize=10)
-        
+            ax5.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height + (abs(height) * 0.02 if height >= 0 else -abs(height) * 0.02),
+                f"${val:.2f}",
+                ha="center",
+                va="bottom" if height >= 0 else "top",
+                fontsize=10,
+            )
+
         # 6. Performance Metrics (Row 3, Col 3)
         ax6 = fig.add_subplot(gs[2, 2])
-        perf_names = ['Win Rate\n%', 'Profit\nFactor', 'Kelly\nCriterion']
+        perf_names = ["Win Rate\n%", "Profit\nFactor", "Kelly\nCriterion"]
         perf_values = [
-            stats.get('win_rate', 0),
-            min(stats.get('profit_factor', 0), 10),  # Cap for visualization
-            risk_metrics.get('kelly_criterion', 0) * 100  # Convert to percentage
+            stats.get("win_rate", 0),
+            min(stats.get("profit_factor", 0), 10),  # Cap for visualization
+            risk_metrics.get("kelly_criterion", 0) * 100,  # Convert to percentage
         ]
-        
-        bars3 = ax6.bar(perf_names, perf_values, color='purple', alpha=0.7)
-        ax6.set_title('Performance Metrics', fontweight='bold', fontsize=12)
-        ax6.set_ylabel('Value')
+
+        bars3 = ax6.bar(perf_names, perf_values, color="purple", alpha=0.7)
+        ax6.set_title("Performance Metrics", fontweight="bold", fontsize=12)
+        ax6.set_ylabel("Value")
         ax6.grid(True, alpha=0.3)
-        
+
         # Add value labels
         for bar, val in zip(bars3, perf_values):
             height = bar.get_height()
-            ax6.text(bar.get_x() + bar.get_width()/2., height + height*0.02,
-                    f'{val:.1f}', ha='center', va='bottom', fontsize=10)
-        
+            ax6.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height + height * 0.02,
+                f"{val:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=10,
+            )
+
         # 7. Holding Period Analysis (Row 4, Col 1-2)
         ax7 = fig.add_subplot(gs[3, :2])
-        holding_periods = trades_df['holding_period_minutes']
-        ax7.scatter(holding_periods, trades_df['pnl'], alpha=0.6, c=trades_df['pnl'], cmap='RdYlGn')
-        ax7.set_xlabel('Holding Period (Minutes)')
-        ax7.set_ylabel('P&L ($)')
-        ax7.set_title('P&L vs Holding Period', fontweight='bold', fontsize=14)
+        holding_periods = trades_df["holding_period_minutes"]
+        ax7.scatter(
+            holding_periods,
+            trades_df["pnl"],
+            alpha=0.6,
+            c=trades_df["pnl"],
+            cmap="RdYlGn",
+        )
+        ax7.set_xlabel("Holding Period (Minutes)")
+        ax7.set_ylabel("P&L ($)")
+        ax7.set_title("P&L vs Holding Period", fontweight="bold", fontsize=14)
         ax7.grid(True, alpha=0.3)
-        
+
         # Add trend line if sufficient data
         if len(trades_df) > 1:
-            z = np.polyfit(holding_periods, trades_df['pnl'], 1)
+            z = np.polyfit(holding_periods, trades_df["pnl"], 1)
             p = np.poly1d(z)
             ax7.plot(holding_periods, p(holding_periods), "r--", alpha=0.8, linewidth=2)
-        
+
         # 8. Correlation Matrix (Row 4, Col 3)
         if len(trades_df) > 2:
             ax8 = fig.add_subplot(gs[3, 2])
-            corr_data = trades_df[['pnl', 'pnl_pct', 'holding_period_minutes', 'trade_value']].corr()
-            im = ax8.imshow(corr_data.values, cmap='coolwarm', aspect='auto', vmin=-1, vmax=1)
-            
+            corr_data = trades_df[
+                ["pnl", "pnl_pct", "holding_period_minutes", "trade_value"]
+            ].corr()
+            im = ax8.imshow(
+                corr_data.values, cmap="coolwarm", aspect="auto", vmin=-1, vmax=1
+            )
+
             # Add labels
-            labels = ['P&L', 'P&L%', 'Hold Time', 'Trade Value']
+            labels = ["P&L", "P&L%", "Hold Time", "Trade Value"]
             ax8.set_xticks(range(len(labels)))
             ax8.set_yticks(range(len(labels)))
-            ax8.set_xticklabels(labels, rotation=45, ha='right')
+            ax8.set_xticklabels(labels, rotation=45, ha="right")
             ax8.set_yticklabels(labels)
-            
+
             # Add correlation values
             for i in range(len(corr_data.columns)):
                 for j in range(len(corr_data.columns)):
-                    ax8.text(j, i, f'{corr_data.iloc[i, j]:.2f}',
-                           ha="center", va="center", color="black", fontweight='bold', fontsize=8)
-            
-            ax8.set_title('Correlation Matrix', fontweight='bold', fontsize=12)
-        
+                    ax8.text(
+                        j,
+                        i,
+                        f"{corr_data.iloc[i, j]:.2f}",
+                        ha="center",
+                        va="center",
+                        color="black",
+                        fontweight="bold",
+                        fontsize=8,
+                    )
+
+            ax8.set_title("Correlation Matrix", fontweight="bold", fontsize=12)
+
         # 9. Trading Psychology Metrics (Row 5, spans all columns)
         ax9 = fig.add_subplot(gs[4, :])
         psych_metrics = [
-            'Max Consecutive\nWins',
-            'Max Consecutive\nLosses', 
-            'Rapid Fire\nTrades',
-            'Avg Time Between\nTrades (min)'
+            "Max Consecutive\nWins",
+            "Max Consecutive\nLosses",
+            "Rapid Fire\nTrades",
+            "Avg Time Between\nTrades (min)",
         ]
         psych_values = [
-            psychology.get('max_consecutive_wins', 0),
-            psychology.get('max_consecutive_losses', 0),
-            psychology.get('rapid_fire_trades', 0),
-            psychology.get('avg_time_between_trades_minutes', 0)
+            psychology.get("max_consecutive_wins", 0),
+            psychology.get("max_consecutive_losses", 0),
+            psychology.get("rapid_fire_trades", 0),
+            psychology.get("avg_time_between_trades_minutes", 0),
         ]
-        
-        bars4 = ax9.bar(psych_metrics, psych_values, color='teal', alpha=0.7)
-        ax9.set_title('Trading Psychology Analysis', fontweight='bold', fontsize=14)
-        ax9.set_ylabel('Count / Minutes')
+
+        bars4 = ax9.bar(psych_metrics, psych_values, color="teal", alpha=0.7)
+        ax9.set_title("Trading Psychology Analysis", fontweight="bold", fontsize=14)
+        ax9.set_ylabel("Count / Minutes")
         ax9.grid(True, alpha=0.3)
-        
+
         # Add value labels
         for bar, val in zip(bars4, psych_values):
             height = bar.get_height()
-            ax9.text(bar.get_x() + bar.get_width()/2., height + height*0.02,
-                    f'{val:.1f}', ha='center', va='bottom', fontsize=10)
-        
+            ax9.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height + height * 0.02,
+                f"{val:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=10,
+            )
+
         # 10. Statistical Summary (Row 6, spans all columns)
         ax10 = fig.add_subplot(gs[5, :])
-        ax10.axis('off')  # Hide axes for text display
-        
+        ax10.axis("off")  # Hide axes for text display
+
         # Create statistical summary text
         summary_text = f"""
 STATISTICAL SUMMARY
@@ -1108,23 +1346,33 @@ Distribution:        Skewness: {stats.get('pnl_skewness', 0):.3f}  |  Kurtosis: 
 Risk Metrics:        Sharpe: {risk_metrics.get('sharpe_ratio', 0):.3f}  |  Max DD: {risk_metrics.get('max_drawdown', 0):.2f}  |  VaR 95%: {risk_metrics.get('var_95', 0):.2f}
 Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0)}  |  Consecutive Losses: {psychology.get('max_consecutive_losses', 0)}  |  Overtrading Risk: {'HIGH' if psychology.get('potential_overtrading', False) else 'LOW'}
         """
-        
-        ax10.text(0.05, 0.8, summary_text, transform=ax10.transAxes, fontsize=11, 
-                 verticalalignment='top', fontfamily='monospace',
-                 bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
-        
+
+        ax10.text(
+            0.05,
+            0.8,
+            summary_text,
+            transform=ax10.transAxes,
+            fontsize=11,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8),
+        )
+
         # Save statistical charts
-        stats_chart_path = self.reports_dir / f"statistical_analysis_{self.today.strftime('%Y%m%d')}.png"
-        plt.savefig(stats_chart_path, dpi=300, bbox_inches='tight')
+        stats_chart_path = (
+            self.reports_dir
+            / f"statistical_analysis_{self.today.strftime('%Y%m%d')}.png"
+        )
+        plt.savefig(stats_chart_path, dpi=300, bbox_inches="tight")
         plt.close()
-        
+
         return str(stats_chart_path)
 
     def generate_html_report(self, analysis_data, account_info, current_positions):
         """Generate comprehensive HTML report"""
-        
+
         main_chart_path, stats_chart_path = self.create_charts(analysis_data)
-        
+
         html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -1170,16 +1418,23 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
         if account_info:
             equity = float(account_info.equity)
             buying_power = float(account_info.buying_power)
-            
+
             # Calculate actual day P&L from completed trades
             day_pnl = 0
-            if 'statistical_analysis' in analysis_data and analysis_data['statistical_analysis']:
-                day_pnl = analysis_data['statistical_analysis'].get('total_pnl', 0)
-            
+            if (
+                "statistical_analysis" in analysis_data
+                and analysis_data["statistical_analysis"]
+            ):
+                day_pnl = analysis_data["statistical_analysis"].get("total_pnl", 0)
+
             # Add unrealized P&L from open positions if available
-            unrealized_pnl = float(account_info.unrealized_pl) if hasattr(account_info, 'unrealized_pl') else 0
+            unrealized_pnl = (
+                float(account_info.unrealized_pl)
+                if hasattr(account_info, "unrealized_pl")
+                else 0
+            )
             total_day_pnl = day_pnl + unrealized_pnl
-            
+
             html_content += f"""
         <div class="section">
             <h2>💰 Account Summary</h2>
@@ -1205,7 +1460,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 """
 
         # Trading Summary
-        trade_summary = analysis_data['trade_summary']
+        trade_summary = analysis_data["trade_summary"]
         if trade_summary:
             html_content += f"""
         <div class="section">
@@ -1237,7 +1492,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 """
 
         # Symbol Performance Table
-        symbol_perf = analysis_data['symbol_performance']
+        symbol_perf = analysis_data["symbol_performance"]
         if symbol_perf:
             html_content += """
         <div class="section">
@@ -1256,12 +1511,14 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
                 </thead>
                 <tbody>
 """
-            
-            for symbol, data in sorted(symbol_perf.items(), key=lambda x: x[1]['pnl'], reverse=True):
-                pnl_class = 'positive' if data['pnl'] >= 0 else 'negative'
+
+            for symbol, data in sorted(
+                symbol_perf.items(), key=lambda x: x[1]["pnl"], reverse=True
+            ):
+                pnl_class = "positive" if data["pnl"] >= 0 else "negative"
                 avg_time = f"{int(data['avg_trade_time'])}:{int((data['avg_trade_time'] % 1) * 60):02d}"
                 buy_sell_ratio = f"{data['buys']}/{data['sells']}"
-                
+
                 html_content += f"""
                     <tr>
                         <td><strong>{symbol}</strong></td>
@@ -1273,7 +1530,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
                         <td>{buy_sell_ratio}</td>
                     </tr>
 """
-            
+
             html_content += """
                 </tbody>
             </table>
@@ -1281,7 +1538,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 """
 
         # Statistical Analysis Section
-        statistical_analysis = analysis_data.get('statistical_analysis', {})
+        statistical_analysis = analysis_data.get("statistical_analysis", {})
         if statistical_analysis:
             html_content += f"""
         <div class="section">
@@ -1350,7 +1607,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 """
 
         # Risk Metrics Section
-        risk_metrics = analysis_data.get('risk_metrics', {})
+        risk_metrics = analysis_data.get("risk_metrics", {})
         if risk_metrics:
             html_content += f"""
         <div class="section">
@@ -1414,7 +1671,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 """
 
         # Trading Psychology Section
-        psychology = analysis_data.get('trading_psychology', {})
+        psychology = analysis_data.get("trading_psychology", {})
         if psychology:
             html_content += f"""
         <div class="section">
@@ -1473,7 +1730,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
             </div>
         </div>
 """
-        
+
         # Statistical Charts (including Equity Curve)
         if stats_chart_path:
             stats_chart_filename = Path(stats_chart_path).name
@@ -1492,7 +1749,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 """
 
         # Recommendations
-        recommendations = analysis_data['recommendations']
+        recommendations = analysis_data["recommendations"]
         if recommendations:
             html_content += """
         <div class="section">
@@ -1506,7 +1763,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
                 <div><strong>Rationale:</strong> {rec['rationale']}</div>
             </div>
 """
-            
+
             html_content += """
         </div>
 """
@@ -1530,7 +1787,7 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
                 </thead>
                 <tbody>
 """
-            
+
             total_unrealized = 0
             for pos in current_positions:
                 side = "LONG" if float(pos.qty) > 0 else "SHORT"
@@ -1540,9 +1797,9 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
                 current_price = abs(market_value / float(pos.qty))
                 unrealized_pnl = float(pos.unrealized_pl)
                 total_unrealized += unrealized_pnl
-                
-                pnl_class = 'positive' if unrealized_pnl >= 0 else 'negative'
-                
+
+                pnl_class = "positive" if unrealized_pnl >= 0 else "negative"
+
                 html_content += f"""
                     <tr>
                         <td><strong>{pos.symbol}</strong></td>
@@ -1554,8 +1811,8 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
                         <td class="{pnl_class}">${unrealized_pnl:+.2f}</td>
                     </tr>
 """
-            
-            pnl_class = 'positive' if total_unrealized >= 0 else 'negative'
+
+            pnl_class = "positive" if total_unrealized >= 0 else "negative"
             html_content += f"""
                 </tbody>
                 <tfoot>
@@ -1713,60 +1970,75 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 """
 
         # Save HTML report
-        html_path = self.reports_dir / f"market_close_report_{self.today.strftime('%Y%m%d')}.html"
-        with open(html_path, 'w', encoding='utf-8') as f:
+        html_path = (
+            self.reports_dir
+            / f"market_close_report_{self.today.strftime('%Y%m%d')}.html"
+        )
+        with open(html_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        
+
         return str(html_path)
 
     def _generate_narrative(self, analysis_data, current_positions):
         """Generate narrative insights about the trading day"""
-        
+
         narrative_parts = []
-        
+
         # Overall day assessment
-        trade_summary = analysis_data['trade_summary']
-        if trade_summary and trade_summary.get('total_trades', 0) > 0:
-            narrative_parts.append(f"""
+        trade_summary = analysis_data["trade_summary"]
+        if trade_summary and trade_summary.get("total_trades", 0) > 0:
+            narrative_parts.append(
+                f"""
             <p><strong>📊 Today's Trading Session Overview:</strong><br>
             Executed {trade_summary['total_trades']} trades across {trade_summary['unique_symbols']} symbols 
             with a total volume of ${trade_summary['total_volume']:,.2f}. 
             Trading activity spanned {trade_summary['trading_span_hours']:.1f} hours 
             from {trade_summary['first_trade'].strftime('%H:%M')} to {trade_summary['last_trade'].strftime('%H:%M')}.</p>
-            """)
-        
+            """
+            )
+
         # Symbol performance narrative
-        symbol_perf = analysis_data['symbol_performance']
+        symbol_perf = analysis_data["symbol_performance"]
         if symbol_perf:
             # Best and worst performers
-            sorted_symbols = sorted(symbol_perf.items(), key=lambda x: x[1]['pnl'], reverse=True)
-            
+            sorted_symbols = sorted(
+                symbol_perf.items(), key=lambda x: x[1]["pnl"], reverse=True
+            )
+
             if sorted_symbols:
                 best_symbol = sorted_symbols[0]
                 worst_symbol = sorted_symbols[-1]
-                
-                narrative_parts.append(f"""
+
+                narrative_parts.append(
+                    f"""
                 <p><strong>🎯 Symbol Performance Analysis:</strong><br>
                 <span class="positive">Best Performer:</span> {best_symbol[0]} generated ${best_symbol[1]['pnl']:+.2f} 
                 ({best_symbol[1]['pnl_pct']:+.2f}%) across {best_symbol[1]['total_trades']} trades. 
                 The symbol showed {'strong momentum' if best_symbol[1]['pnl'] > 50 else 'moderate gains'} 
                 with an average trade execution around {int(best_symbol[1]['avg_trade_time'])}:00.</p>
-                """)
-                
-                if worst_symbol[1]['pnl'] < 0:
-                    narrative_parts.append(f"""
+                """
+                )
+
+                if worst_symbol[1]["pnl"] < 0:
+                    narrative_parts.append(
+                        f"""
                     <p><span class="negative">Challenging Symbol:</span> {worst_symbol[0]} resulted in 
                     ${worst_symbol[1]['pnl']:+.2f} ({worst_symbol[1]['pnl_pct']:+.2f}%) loss. 
                     This suggests {'overtrading' if worst_symbol[1]['total_trades'] > 5 else 'poor entry timing'} 
                     and warrants strategy review for this symbol.</p>
-                    """)
-        
+                    """
+                    )
+
         # Time-based analysis narrative
-        time_analysis = analysis_data['time_analysis']
+        time_analysis = analysis_data["time_analysis"]
         if time_analysis:
             # Find best performing hour
-            best_hour = max(time_analysis.items(), key=lambda x: x[1]['pnl']) if time_analysis else None
-            
+            best_hour = (
+                max(time_analysis.items(), key=lambda x: x[1]["pnl"])
+                if time_analysis
+                else None
+            )
+
             if best_hour:
                 hour_24 = best_hour[0]
                 hour_12 = f"{hour_24}:00 {'AM' if hour_24 < 12 else 'PM'}"
@@ -1774,59 +2046,75 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
                     hour_12 = f"{hour_24-12}:00 PM"
                 elif hour_24 == 12:
                     hour_12 = "12:00 PM"
-                
-                narrative_parts.append(f"""
+
+                narrative_parts.append(
+                    f"""
                 <p><strong>⏰ Timing Analysis:</strong><br>
                 Most profitable trading occurred around {hour_12} with ${best_hour[1]['pnl']:+.2f} P&L 
                 across {best_hour[1]['trades']} trades. This suggests 
                 {'strong market momentum' if hour_24 >= 10 and hour_24 <= 11 else 'volatility opportunities'} 
                 during this timeframe.</p>
-                """)
-        
+                """
+                )
+
         # Side bias analysis
-        side_analysis = analysis_data['side_analysis']
+        side_analysis = analysis_data["side_analysis"]
         if side_analysis:
-            long_bias_count = len(side_analysis['long_bias_symbols'])
-            short_bias_count = len(side_analysis['short_bias_symbols'])
-            
+            long_bias_count = len(side_analysis["long_bias_symbols"])
+            short_bias_count = len(side_analysis["short_bias_symbols"])
+
             if long_bias_count > short_bias_count:
-                narrative_parts.append(f"""
+                narrative_parts.append(
+                    f"""
                 <p><strong>📈 Market Sentiment:</strong><br>
                 Today showed a <span class="positive">bullish bias</span> with {long_bias_count} symbols 
                 trending towards long positions. This suggests strong underlying market momentum 
                 and confidence in upward price movements.</p>
-                """)
+                """
+                )
             elif short_bias_count > long_bias_count:
-                narrative_parts.append(f"""
+                narrative_parts.append(
+                    f"""
                 <p><strong>📉 Market Sentiment:</strong><br>
                 Today exhibited a <span class="negative">bearish bias</span> with {short_bias_count} symbols 
                 favoring short positions. This indicates market uncertainty or downward pressure 
                 creating profitable shorting opportunities.</p>
-                """)
-        
+                """
+                )
+
         # Current positions context
         if current_positions:
-            total_unrealized = sum(float(pos.unrealized_pl) for pos in current_positions)
+            total_unrealized = sum(
+                float(pos.unrealized_pl) for pos in current_positions
+            )
             if total_unrealized > 0:
-                narrative_parts.append(f"""
+                narrative_parts.append(
+                    f"""
                 <div class="highlight">
                 <strong>🛡️ Overnight Risk Assessment:</strong><br>
                 Carrying {len(current_positions)} open positions into tomorrow with 
                 <span class="positive">${total_unrealized:+.2f} unrealized gains</span>. 
                 Consider implementing protective stops to preserve profits.
                 </div>
-                """)
+                """
+                )
             elif total_unrealized < 0:
-                narrative_parts.append(f"""
+                narrative_parts.append(
+                    f"""
                 <div class="highlight">
                 <strong>⚠️ Overnight Risk Assessment:</strong><br>
                 Holding {len(current_positions)} positions with 
                 <span class="negative">${total_unrealized:+.2f} unrealized losses</span>. 
                 Review positions for potential exit strategies or hedging opportunities.
                 </div>
-                """)
-        
-        return ''.join(narrative_parts) if narrative_parts else "<p>No trading activity to analyze today.</p>"
+                """
+                )
+
+        return (
+            "".join(narrative_parts)
+            if narrative_parts
+            else "<p>No trading activity to analyze today.</p>"
+        )
 
     def get_account_info(self):
         """Get current account information"""
@@ -1848,56 +2136,67 @@ Psychology:          Consecutive Wins: {psychology.get('max_consecutive_wins', 0
 
     def generate_report(self):
         """Main function to generate comprehensive market close report"""
-        
+
         print("🔄 Gathering trading data...")
-        
+
         # Get trading data
         today_orders, yesterday_orders = self.get_extended_orders()
-        
+
         print("📊 Analyzing performance...")
-        
+
         # Analyze performance
         analysis_data = self.analyze_trade_performance(today_orders, yesterday_orders)
-        
+
         print("💰 Fetching account information...")
-        
+
         # Get account info and positions
         account_info = self.get_account_info()
         current_positions = self.get_current_positions()
-        
+
         print("📝 Generating comprehensive report...")
-        
+
         # Generate HTML report
-        html_report_path = self.generate_html_report(analysis_data, account_info, current_positions)
-        
+        html_report_path = self.generate_html_report(
+            analysis_data, account_info, current_positions
+        )
+
         print("✅ Market Close Report Generation Complete!")
-        print("="*80)
+        print("=" * 80)
         print(f"📄 HTML Report: {html_report_path}")
-        
-        if analysis_data['trade_summary']:
-            summary = analysis_data['trade_summary']
-            print(f"📊 Summary: {summary['total_trades']} trades, {summary['unique_symbols']} symbols, ${summary['total_volume']:,.2f} volume")
-        
+
+        if analysis_data["trade_summary"]:
+            summary = analysis_data["trade_summary"]
+            print(
+                f"📊 Summary: {summary['total_trades']} trades, {summary['unique_symbols']} symbols, ${summary['total_volume']:,.2f} volume"
+            )
+
         if current_positions:
-            total_unrealized = sum(float(pos.unrealized_pl) for pos in current_positions)
-            print(f"💼 Open Positions: {len(current_positions)} positions, ${total_unrealized:+.2f} unrealized P&L")
-        
+            total_unrealized = sum(
+                float(pos.unrealized_pl) for pos in current_positions
+            )
+            print(
+                f"💼 Open Positions: {len(current_positions)} positions, ${total_unrealized:+.2f} unrealized P&L"
+            )
+
         return html_report_path
+
 
 def main():
     """Main function to run market close report generation"""
     try:
         generator = MarketCloseReportGenerator()
         report_path = generator.generate_report()
-        
+
         # Open report in browser
         import webbrowser
-        webbrowser.open(f'file://{Path(report_path).absolute()}')
-        
+
+        webbrowser.open(f"file://{Path(report_path).absolute()}")
+
     except KeyboardInterrupt:
         print("\n\n👋 Report generation interrupted by user")
     except Exception as e:
         print(f"❌ Error generating report: {e}")
+
 
 if __name__ == "__main__":
     main()

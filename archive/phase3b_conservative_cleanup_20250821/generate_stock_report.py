@@ -4,15 +4,17 @@ Run intraday stock analysis and generate comprehensive report
 
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.find_intraday_stocks import IntradayStockFinder
 from datetime import datetime
 import json
 
+
 def generate_markdown_report(results, filename):
     """Generate comprehensive markdown report"""
-    
+
     report = f"""# 📈 Intraday Trading Stock Analysis Report
 
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
@@ -25,7 +27,7 @@ def generate_markdown_report(results, filename):
 
 ### Top 5 Recommendations
 """
-    
+
     # Top 5 table
     if results:
         report += """
@@ -34,7 +36,7 @@ def generate_markdown_report(results, filename):
 """
         for i, stock in enumerate(results[:5]):
             report += f"| {i+1} | **{stock['symbol']}** | ${stock['current_price']:.2f} | {stock['total_score']:.1f}/100 | {stock['trading_suitability']} | {stock['volatility_profile']} | {stock['suggested_stop_loss']:.2f}% | {stock['suggested_take_profit']:.2f}% |\n"
-    
+
     report += f"""
 
 ### Key Insights
@@ -144,46 +146,50 @@ def generate_markdown_report(results, filename):
 
 **Disclaimer:** This analysis is for educational purposes. Past performance does not guarantee future results. Always use proper risk management and only trade with money you can afford to lose.
 """
-    
+
     # Write to file
-    with open(filename, 'w', encoding='utf-8') as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write(report)
-    
+
     print(f"📄 Report saved to: {filename}")
+
 
 def main():
     """Run analysis and generate report"""
     print("🚀 Starting comprehensive intraday stock analysis...")
-    
+
     # Run the analysis
     finder = IntradayStockFinder(max_price=100, min_volume=1000000)
     results = finder.run_analysis()
-    
+
     if not results:
         print("❌ No suitable stocks found")
         return
-    
+
     # Generate report filename with timestamp
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"C:\\Users\\will7\\OneDrive - Sygma Data Analytics\\Stock Trading\\Scalping Bot System\\docs\\intraday_stock_analysis_{timestamp}.md"
-    
+
     # Generate markdown report
     generate_markdown_report(results, filename)
-    
+
     # Also save raw data as JSON for further analysis
-    json_filename = filename.replace('.md', '.json')
-    with open(json_filename, 'w') as f:
+    json_filename = filename.replace(".md", ".json")
+    with open(json_filename, "w") as f:
         json.dump(results, f, indent=2)
-    
+
     print(f"✅ Analysis complete!")
     print(f"📊 Found {len(results)} suitable stocks")
     print(f"📄 Report: {filename}")
     print(f"📄 Raw data: {json_filename}")
-    
+
     # Show top 5 summary
     print(f"\n🏆 Top 5 Stocks:")
     for i, stock in enumerate(results[:5]):
-        print(f"{i+1}. {stock['symbol']}: ${stock['current_price']:.2f} - {stock['total_score']:.1f}/100 ({stock['trading_suitability']})")
+        print(
+            f"{i+1}. {stock['symbol']}: ${stock['current_price']:.2f} - {stock['total_score']:.1f}/100 ({stock['trading_suitability']})"
+        )
+
 
 if __name__ == "__main__":
     main()
