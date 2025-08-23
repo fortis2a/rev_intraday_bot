@@ -1,11 +1,15 @@
 """
 Real-time confidence calculation integration for Command Center
 Integrates with existing strategy confidence calculations
+
+Note: This file uses random number generation for simulation purposes only.
+Security scanner warnings about random usage are suppressed as this is demo code.
 """
 
 import asyncio
 import json
 import logging
+import random  # nosec B311 - simulation and demo purposes only
 import threading
 import time
 from datetime import datetime, timedelta
@@ -182,9 +186,8 @@ class ConfidenceCalculator:
         self, strategy_name: str, indicators: Dict
     ) -> Dict:
         """Simulate strategy confidence based on indicators"""
-        import random
 
-        base_confidence = random.uniform(40, 80)
+        base_confidence = random.uniform(40, 80)  # nosec B311 - simulation only
 
         # Adjust based on strategy type and indicators
         if strategy_name == "MeanReversionStrategy":
@@ -201,7 +204,9 @@ class ConfidenceCalculator:
             adx = indicators.get("adx", 20)
             if adx > 25:
                 base_confidence += 15
-                signal = "BUY" if random.random() > 0.5 else "SELL"
+                signal = (
+                    "BUY" if random.random() > 0.5 else "SELL"
+                )  # nosec B311 - simulation only
             else:
                 signal = "HOLD"
 
@@ -267,7 +272,6 @@ class ConfidenceCalculator:
         """Get market data for symbol (would integrate with data manager)"""
         # This would integrate with your existing data manager
         # For now, simulate realistic market data
-        import random
 
         base_prices = {
             "SOXL": 29.27,
@@ -292,7 +296,6 @@ class ConfidenceCalculator:
 
     def simulate_confidence(self, symbol: str) -> Dict:
         """Simulate confidence data when real calculation is not available"""
-        import random
 
         overall_confidence = random.uniform(35, 85)
 
@@ -330,7 +333,6 @@ class ConfidenceCalculator:
 
     def simulate_indicators(self) -> Dict:
         """Simulate technical indicators"""
-        import random
 
         return {
             "rsi": random.uniform(20, 80),
@@ -388,7 +390,6 @@ class ConfidenceCalculator:
             }
 
         # Simulation fallback
-        import random
 
         confidence = random.uniform(45, 85)
         signal = "BUY" if confidence > 75 else "WATCH" if confidence > 65 else "HOLD"

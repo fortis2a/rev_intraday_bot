@@ -463,8 +463,6 @@ def should_execute_trade(symbol: str, signal_type: str = "entry") -> dict:
 
     return decision
 
-    return profile_adjustment + (stock_multiplier - 1.0)
-
 
 def print_stock_analysis_summary():
     """Print a summary of all stock configurations"""

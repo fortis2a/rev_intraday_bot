@@ -969,17 +969,17 @@ class IntradayEngine:
                         return "buy"
                     if q < 0:
                         return "sell"
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.debug(f"Error parsing quantity: {e}")
             # 3) Fallback to market_value sign (shorts often negative)
             if "market_value" in broker_position:
                 try:
                     mv = float(broker_position.get("market_value") or 0)
                     return "sell" if mv < 0 else "buy"
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    self.logger.debug(f"Error parsing market_value: {e}")
+        except Exception as e:
+            self.logger.debug(f"Error determining position side: {e}")
         # Default safe assumption
         return "buy"
 
@@ -1566,7 +1566,8 @@ class IntradayEngine:
                     )
 
                     # Recalculate stop loss and profit target based on ACTUAL execution price
-                    from utils.signal_helper import calculate_adaptive_signal_levels
+                    from utils.signal_helper import \
+                        calculate_adaptive_signal_levels
 
                     actual_levels = calculate_adaptive_signal_levels(
                         symbol=signal.symbol,
@@ -1662,8 +1663,8 @@ class IntradayEngine:
                     self.symbol_trade_count[signal.symbol] = (
                         self.symbol_trade_count.get(signal.symbol, 0) + 1
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.warning(f"Error updating trade counts: {e}")
                 atr_pct_str = f"{atr_pct:.3f}" if atr_pct else "n/a"
                 self.logger.info(
                     f"✅ Position created for {signal.symbol}: {execution_position_size} @ ${execution_entry_price:.2f} "
@@ -1676,10 +1677,10 @@ class IntradayEngine:
 
                     # 🔍 ENHANCED: Capture complete decision context for trade analysis
                     try:
-                        from core.unified_indicators import unified_indicator_service
-                        from stock_specific_config import (
-                            get_real_time_confidence_for_trade,
-                        )
+                        from core.unified_indicators import \
+                            unified_indicator_service
+                        from stock_specific_config import \
+                            get_real_time_confidence_for_trade
 
                         # Get current indicator snapshot
                         bars = self.data_manager.get_bars(

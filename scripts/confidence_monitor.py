@@ -126,8 +126,17 @@ class ConfidenceMonitor:
 
     def display_confidence_dashboard(self):
         """Display the real-time confidence dashboard"""
-        # Clear screen
-        os.system("cls" if os.name == "nt" else "clear")
+        # Clear screen safely
+        import subprocess
+
+        try:
+            if os.name == "nt":
+                subprocess.run(["cls"], shell=False, check=True, capture_output=True)
+            else:
+                subprocess.run(["clear"], shell=False, check=True, capture_output=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to simple screen clearing with ANSI codes
+            print("\033[2J\033[H", end="")
 
         print("🎯 REAL-TIME CONFIDENCE MONITOR")
         print("=" * 120)

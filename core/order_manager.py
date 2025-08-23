@@ -12,20 +12,15 @@ import alpaca_trade_api as tradeapi
 from config import config
 from core.trailing_stop_manager import TrailingStopManager
 from utils.logger import clean_message, setup_logger
-from utils.price_utils import (
-    calculate_stop_loss_price,
-    calculate_take_profit_price,
-    round_to_cent,
-    validate_price_precision,
-)
+from utils.price_utils import (calculate_stop_loss_price,
+                               calculate_take_profit_price, round_to_cent,
+                               validate_price_precision)
 
 # Import stock-specific configuration
 try:
-    from stock_specific_config import (
-        get_confidence_adjustment,
-        get_position_size_multiplier,
-        get_stock_thresholds,
-    )
+    from stock_specific_config import (get_confidence_adjustment,
+                                       get_position_size_multiplier,
+                                       get_stock_thresholds)
 
     STOCK_SPECIFIC_AVAILABLE = True
 except ImportError:

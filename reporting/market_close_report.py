@@ -1589,16 +1589,12 @@ class MarketCloseReportGenerator:
             }
 
         # Calculate summary statistics for today's activities only
-        today_trades = [
-            a for a in all_activities if a.transaction_time.date() == date.today()
-        ]
-
-        if not today_trades:
+        if not today_trades_data:
             return {
                 "total_trades": 0,
                 "total_volume": 0,
                 "net_pnl": total_realized_pnl,
-                "unique_symbols": len(symbols),
+                "unique_symbols": 0,
                 "buy_orders": 0,
                 "sell_orders": 0,
                 "short_sell_orders": 0,
@@ -1608,24 +1604,28 @@ class MarketCloseReportGenerator:
             }
 
         # Calculate today's statistics
-        total_volume = sum(float(a.qty) * float(a.price) for a in today_trades)
-        buy_orders = sum(1 for a in today_trades if a.side == "buy")
-        sell_orders = sum(1 for a in today_trades if a.side == "sell")
-        short_sell_orders = sum(1 for a in today_trades if a.side == "sell_short")
+        total_volume = sum(trade["value"] for trade in today_trades_data)
+        buy_orders = sum(1 for trade in today_trades_data if trade["side"] == "buy")
+        sell_orders = sum(1 for trade in today_trades_data if trade["side"] == "sell")
+        short_sell_orders = sum(
+            1 for trade in today_trades_data if trade["side"] == "sell_short"
+        )
 
         # Count COMPLETED TRADES (sell transactions) to match statistical analysis
         completed_trades = sell_orders + short_sell_orders
 
-        first_trade = min(a.transaction_time for a in today_trades)
-        last_trade = max(a.transaction_time for a in today_trades)
+        first_trade = min(trade["filled_at"] for trade in today_trades_data)
+        last_trade = max(trade["filled_at"] for trade in today_trades_data)
         trading_span = (last_trade - first_trade).total_seconds() / 3600
 
         return {
             "total_trades": completed_trades,  # Count completed trades (sells) to match statistical analysis
-            "total_activities": len(today_trades),  # Total activities for reference
+            "total_activities": len(
+                today_trades_data
+            ),  # Total activities for reference
             "total_volume": total_volume,
             "net_pnl": total_realized_pnl,  # Cross-day round-trip P&L
-            "unique_symbols": len(set(a.symbol for a in today_trades)),
+            "unique_symbols": len(set(trade["symbol"] for trade in today_trades_data)),
             "buy_orders": buy_orders,
             "sell_orders": sell_orders,
             "short_sell_orders": short_sell_orders,

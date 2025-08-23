@@ -38,7 +38,16 @@ class AutoMarketSleepWake:
 
     def clear_screen(self):
         """Clear the terminal screen"""
-        os.system("cls" if os.name == "nt" else "clear")
+        import subprocess
+
+        try:
+            if os.name == "nt":
+                subprocess.run(["cls"], shell=False, check=True, capture_output=True)
+            else:
+                subprocess.run(["clear"], shell=False, check=True, capture_output=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to simple screen clearing with ANSI codes
+            print("\033[2J\033[H", end="")
 
     def get_market_status(self):
         """Get current market status"""

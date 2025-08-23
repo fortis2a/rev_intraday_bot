@@ -119,12 +119,6 @@ class TradeRecord:
             "volume_ratio": self.volume_ratio,
             "exit_reason": self.exit_reason,
         }
-        if risk > 0:
-            self.r_multiple = self.realized_pnl / (risk * self.position_size)
-
-        # Calculate holding time in seconds
-        if self.entry_time:
-            self.hold_time_s = (self.exit_time - self.entry_time).total_seconds()
 
     def __str__(self):
         """String representation"""

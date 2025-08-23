@@ -37,7 +37,9 @@ class TestSystemIntegration:
 
             # Should not raise an error with mock environment variables
             assert config.ALPACA_API_KEY == "test_key"
-            assert config.ALPACA_SECRET_KEY == "test_secret"
+            assert (
+                config.ALPACA_SECRET_KEY == "test_secret"
+            )  # nosec B105 - test credentials only
         except Exception as e:
             pytest.skip(f"Config test failed: {e}")
 
@@ -65,7 +67,8 @@ class TestSystemIntegration:
     def test_reporting_system_import(self):
         """Test reporting system imports"""
         try:
-            from reporting.generate_todays_pnl import generate_todays_pnl_report
+            from reporting.generate_todays_pnl import \
+                generate_todays_pnl_report
             from reporting.today_analysis import TodayAnalysis
 
             assert TodayAnalysis.__name__ == "TodayAnalysis"
