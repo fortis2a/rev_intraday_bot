@@ -14,6 +14,7 @@ import sys
 import os
 from pathlib import Path
 
+
 def get_python_cmd():
     """Get the correct Python command for this environment"""
     # Check if we're in a virtual environment
@@ -22,19 +23,20 @@ def get_python_cmd():
         return f'& "{venv_python}"'
     return "python"
 
+
 def run_command(cmd, description):
     """Run a command and return success status"""
     print(f"\n🔍 {description}")
     print(f"Command: {cmd}")
     print("-" * 50)
-    
+
     # Use PowerShell execution for commands with &
-    if cmd.startswith('& '):
-        result = subprocess.run(['powershell', '-Command', cmd], capture_output=False)
+    if cmd.startswith("& "):
+        result = subprocess.run(["powershell", "-Command", cmd], capture_output=False)
     else:
         result = subprocess.run(cmd, shell=True, capture_output=False)
     success = result.returncode == 0
-    
+
     if success:
         print(f"✅ {description} - PASSED")
     else:
@@ -51,20 +53,29 @@ def main():
     # Change to project root (parent of cicd folder)
     project_root = Path(__file__).parent.parent
     os.chdir(project_root)
-    
+
     # Get the correct Python command
     python_cmd = get_python_cmd()
-    
+
     checks = [
         (f"{python_cmd} -m black --check --diff .", "Code formatting check"),
-        (f"{python_cmd} -m isort --check-only --diff .", "Import sorting check"), 
+        (f"{python_cmd} -m isort --check-only --diff .", "Import sorting check"),
         (f"{python_cmd} -m flake8 .", "Code linting"),
-        (f"{python_cmd} -m pytest tests/ -m 'unit or not integration' -v", "Unit tests"),
+        (
+            f"{python_cmd} -m pytest tests/ -m 'unit or not integration' -v",
+            "Unit tests",
+        ),
         (f"{python_cmd} -m pytest tests/ -m integration -v", "Integration tests"),
-        (f"{python_cmd} -m safety check -r requirements.txt", "Security vulnerability check"),
-        (f"{python_cmd} -m bandit -r . -x tests/,archive/,backup_*/ -ll", "Security linting"),
+        (
+            f"{python_cmd} -m safety check -r requirements.txt",
+            "Security vulnerability check",
+        ),
+        (
+            f"{python_cmd} -m bandit -r . -x tests/,archive/,backup_*/ -ll",
+            "Security linting",
+        ),
     ]
-    
+
     passed = 0
     total = len(checks)
 
