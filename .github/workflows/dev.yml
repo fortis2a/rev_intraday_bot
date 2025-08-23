@@ -1,0 +1,86 @@
+name: Development Workflow
+
+on:
+  push:
+    branches: [ develop, feature/* ]
+  pull_request:
+    branches: [ develop ]
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  quick-validation:
+    name: 🚀 Quick Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install black flake8 isort
+        
+    - name: Quick code check
+      run: |
+        echo "🔍 Running quick validation..."
+        black --check --diff . || echo "❌ Code formatting needs attention"
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        
+    - name: Run unit tests only
+      run: |
+        pytest tests/ -m "unit or not integration" -x --tb=short
+        
+    - name: Syntax validation
+      run: |
+        python -m py_compile main.py
+        python -m py_compile config.py
+        python -m py_compile data_manager.py
+        echo "✅ Core files syntax validated"
+
+  auto-format:
+    name: 🎨 Auto-format Code
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install formatting tools
+      run: |
+        pip install black isort
+        
+    - name: Auto-format code
+      run: |
+        black .
+        isort .
+        
+    - name: Commit changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .
+        git diff --staged --quiet || git commit -m "🎨 Auto-format code [skip ci]"
+        git push

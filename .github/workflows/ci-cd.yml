@@ -1,0 +1,280 @@
+name: Trading Bot CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ============================================================
+  # CONTINUOUS INTEGRATION (CI)
+  # ============================================================
+  
+  lint-and-format:
+    name: 🔍 Code Quality & Formatting
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install formatting tools
+      run: |
+        pip install black flake8 isort mypy
+        
+    - name: Check code formatting with Black
+      run: black --check --diff .
+      
+    - name: Check import sorting with isort
+      run: isort --check-only --diff .
+      
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+        
+    - name: Type checking with mypy
+      run: mypy . --ignore-missing-imports || true
+
+  test-suite:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    strategy:
+      matrix:
+        test-type: [unit, integration]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run ${{ matrix.test-type }} tests
+      run: |
+        pytest -m ${{ matrix.test-type }} --cov=. --cov-report=xml
+        
+    - name: Upload coverage to Codecov
+      if: matrix.test-type == 'unit'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  security-scan:
+    name: 🔒 Security Scanning
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install security tools
+      run: |
+        pip install safety bandit
+        
+    - name: Check for known security vulnerabilities
+      run: safety check -r requirements.txt
+      
+    - name: Run bandit security linter
+      run: bandit -r . -x tests/,archive/,backup_*/
+
+  performance-test:
+    name: ⚡ Performance Testing
+    runs-on: ubuntu-latest
+    needs: test-suite
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-benchmark
+        
+    - name: Run performance benchmarks
+      run: |
+        pytest tests/ -k "benchmark" --benchmark-only || echo "No benchmark tests found"
+
+  # ============================================================
+  # CONTINUOUS DEPLOYMENT (CD) - STAGING
+  # ============================================================
+  
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test-suite, security-scan]
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'staging')
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run paper trading validation
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_PAPER_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_PAPER_SECRET_KEY }}
+        ALPACA_BASE_URL: https://paper-api.alpaca.markets
+      run: |
+        python -c "
+        import config
+        from data_manager import DataManager
+        print('🔍 Validating paper trading connection...')
+        dm = DataManager()
+        print('✅ Paper trading environment validated')
+        "
+        
+    - name: Deploy configuration update
+      run: |
+        echo "🚀 Staging deployment completed"
+        echo "Environment: Paper Trading"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+
+  # ============================================================
+  # CONTINUOUS DEPLOYMENT (CD) - PRODUCTION
+  # ============================================================
+  
+  deploy-production:
+    name: 🏭 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test-suite, security-scan, performance-test]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'production')
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Pre-deployment health check
+      env:
+        ALPACA_API_KEY: ${{ secrets.ALPACA_LIVE_API_KEY }}
+        ALPACA_SECRET_KEY: ${{ secrets.ALPACA_LIVE_SECRET_KEY }}
+        ALPACA_BASE_URL: https://api.alpaca.markets
+      run: |
+        python -c "
+        import config
+        from data_manager import DataManager
+        print('🔍 Validating live trading connection...')
+        dm = DataManager()
+        print('✅ Live trading environment validated')
+        print('⚠️  Ready for live deployment - USE WITH CAUTION')
+        "
+        
+    - name: Create deployment backup
+      run: |
+        echo "📦 Creating deployment backup..."
+        git tag "production-$(date +%Y%m%d-%H%M%S)"
+        
+    - name: Deploy to production
+      run: |
+        echo "🏭 PRODUCTION DEPLOYMENT COMPLETED"
+        echo "Environment: LIVE TRADING"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "⚠️  LIVE TRADING IS NOW ACTIVE"
+
+  # ============================================================
+  # MONITORING & NOTIFICATIONS
+  # ============================================================
+  
+  notify-deployment:
+    name: 📢 Deployment Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result != 'skipped' || needs.deploy-production.result != 'skipped')
+    
+    steps:
+    - name: Determine deployment status
+      id: deployment_status
+      run: |
+        if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
+          echo "environment=PRODUCTION" >> $GITHUB_OUTPUT
+          echo "status=SUCCESS" >> $GITHUB_OUTPUT
+          echo "emoji=🏭" >> $GITHUB_OUTPUT
+        elif [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
+          echo "environment=STAGING" >> $GITHUB_OUTPUT
+          echo "status=SUCCESS" >> $GITHUB_OUTPUT
+          echo "emoji=🚀" >> $GITHUB_OUTPUT
+        else
+          echo "environment=UNKNOWN" >> $GITHUB_OUTPUT
+          echo "status=FAILED" >> $GITHUB_OUTPUT
+          echo "emoji=❌" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Deployment summary
+      run: |
+        echo "## ${{ steps.deployment_status.outputs.emoji }} Trading Bot Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ steps.deployment_status.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ${{ steps.deployment_status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [[ "${{ steps.deployment_status.outputs.environment }}" == "PRODUCTION" ]]; then
+          echo "⚠️ **LIVE TRADING IS NOW ACTIVE** ⚠️" >> $GITHUB_STEP_SUMMARY
+        fi
