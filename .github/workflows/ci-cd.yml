@@ -1,10 +1,15 @@
-name: Trading Bot CI/CD Pipeline
+# TEMPORARILY DISABLED - Using simplified CI instead
+# This workflow was causing dependency conflicts with talib-binary
+# Using simple-ci.yml for paper trading development until we resolve complex dependencies
+
+name: Trading Bot CI/CD Pipeline (DISABLED)
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+  # Commented out to disable this workflow
+  # push:
+  #   branches: [ main, develop ]
+  # pull_request:
+  #   branches: [ main ]
   workflow_dispatch:
     inputs:
       deploy_environment:
