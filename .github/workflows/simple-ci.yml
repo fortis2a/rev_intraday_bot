@@ -62,11 +62,19 @@ jobs:
     - name: Validate paper trading bot syntax
       run: |
         echo "🔍 Checking core trading bot files..."
+        echo "📋 Root level files:"
         python -m py_compile config.py
         python -m py_compile main.py
-        python -m py_compile data_manager.py
         python -m py_compile strategies.py
-        echo "✅ Core bot files syntax validated"
+        python -m py_compile stock_specific_config.py
+        
+        echo "📋 Core module files:"
+        python -m py_compile core/data_manager.py
+        python -m py_compile core/intraday_engine.py
+        python -m py_compile core/order_manager.py
+        python -m py_compile core/risk_manager.py
+        
+        echo "✅ All core bot files syntax validated"
         
     - name: Test paper trading configuration
       run: |
