@@ -226,11 +226,11 @@ class MarketCloseReportGenerator:
         # Analyze by trade side (using today-only P&L data)
         side_analysis = self._analyze_side_performance(df_with_pnl)
         
-        # Statistical analysis (using today-only P&L data)
-        statistical_analysis = self._perform_statistical_analysis(df_with_pnl)
+        # Statistical analysis (using corrected P&L calculation)
+        statistical_analysis = self._perform_statistical_analysis_with_correct_pnl()
         
-        # Risk metrics
-        risk_metrics = self._calculate_risk_metrics(df_with_pnl)
+        # Risk metrics (using corrected P&L calculation)
+        risk_metrics = self._calculate_risk_metrics_with_correct_pnl()
         
         # Trading psychology metrics
         trading_psychology = self._analyze_trading_psychology(df_with_pnl)
@@ -1406,6 +1406,221 @@ class MarketCloseReportGenerator:
             
         except Exception as e:
             self.logger.error(f"Error in symbol performance analysis: {e}")
+            return {}
+
+    def _perform_statistical_analysis_with_correct_pnl(self):
+        """Perform statistical analysis using the corrected P&L calculation method"""
+        try:
+            # Use the same API call as the corrected methods
+            activities = self.api.get_activities(activity_types='FILL')
+            today_activities_direct = [a for a in activities if a.transaction_time.date() == date.today()]
+            
+            if not today_activities_direct:
+                return {}
+            
+            # Convert to trade data format
+            today_trades_data = []
+            for activity in today_activities_direct:
+                today_trades_data.append({
+                    'symbol': activity.symbol,
+                    'side': activity.side,
+                    'qty': float(activity.qty),
+                    'price': float(activity.price),
+                    'value': float(activity.qty) * float(activity.price),
+                    'filled_at': activity.transaction_time
+                })
+            
+            # Group by symbol and calculate P&L for each trade
+            buys_today = {}
+            sells_today = {}
+            
+            for trade in today_trades_data:
+                symbol = trade['symbol']
+                side = trade['side']
+                qty = trade['qty']
+                price = trade['price']
+                
+                if side == 'buy':
+                    if symbol not in buys_today:
+                        buys_today[symbol] = []
+                    buys_today[symbol].append((qty, price))
+                else:  # sell or sell_short
+                    if symbol not in sells_today:
+                        sells_today[symbol] = []
+                    sells_today[symbol].append((qty, price))
+            
+            # Calculate individual trade P&L values for statistics
+            trade_pnl_values = []
+            winning_trades = 0
+            losing_trades = 0
+            
+            # Calculate P&L for symbols that have both buys and sells today
+            for symbol in sells_today:
+                if symbol in buys_today:
+                    buy_queue = buys_today[symbol][:]
+                    
+                    for sell_qty, sell_price in sells_today[symbol]:
+                        remaining_sell = sell_qty
+                        trade_pnl = 0
+                        
+                        while remaining_sell > 0 and buy_queue:
+                            buy_qty, buy_price = buy_queue[0]
+                            
+                            match_qty = min(remaining_sell, buy_qty)
+                            pnl = match_qty * (sell_price - buy_price)
+                            trade_pnl += pnl
+                            
+                            remaining_sell -= match_qty
+                            buy_queue[0] = (buy_qty - match_qty, buy_price)
+                            
+                            if buy_queue[0][0] == 0:
+                                buy_queue.pop(0)
+                        
+                        # Record this trade's P&L
+                        trade_pnl_values.append(trade_pnl)
+                        if trade_pnl > 0:
+                            winning_trades += 1
+                        elif trade_pnl < 0:
+                            losing_trades += 1
+            
+            if not trade_pnl_values:
+                return {}
+            
+            # Calculate statistics
+            total_trades = len(trade_pnl_values)
+            total_pnl = sum(trade_pnl_values)
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+            
+            winning_pnl = sum(pnl for pnl in trade_pnl_values if pnl > 0)
+            losing_pnl = abs(sum(pnl for pnl in trade_pnl_values if pnl < 0))
+            profit_factor = (winning_pnl / losing_pnl) if losing_pnl > 0 else float('inf')
+            
+            avg_win = (winning_pnl / winning_trades) if winning_trades > 0 else 0
+            avg_loss = (losing_pnl / losing_trades) if losing_trades > 0 else 0
+            
+            import numpy as np
+            
+            return {
+                'total_completed_trades': total_trades,
+                'winning_trades': winning_trades,
+                'losing_trades': losing_trades,
+                'breakeven_trades': total_trades - winning_trades - losing_trades,
+                'win_rate': win_rate,
+                'avg_win': avg_win,
+                'avg_loss': -avg_loss if avg_loss > 0 else 0,
+                'largest_win': max(trade_pnl_values) if trade_pnl_values else 0,
+                'largest_loss': min(trade_pnl_values) if trade_pnl_values else 0,
+                'total_pnl': total_pnl,  # This should now match the $706.20
+                'avg_pnl': total_pnl / total_trades if total_trades > 0 else 0,
+                'median_pnl': np.median(trade_pnl_values) if trade_pnl_values else 0,
+                'profit_factor': profit_factor,
+                'reward_risk_ratio': (avg_win / abs(avg_loss)) if avg_loss != 0 else 0,
+                'pnl_std': np.std(trade_pnl_values) if len(trade_pnl_values) > 1 else 0,
+                'pnl_variance': np.var(trade_pnl_values) if len(trade_pnl_values) > 1 else 0
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in corrected statistical analysis: {e}")
+            return {}
+
+    def _calculate_risk_metrics_with_correct_pnl(self):
+        """Calculate risk metrics using the corrected P&L calculation method"""
+        try:
+            # Get the same statistical data
+            stats = self._perform_statistical_analysis_with_correct_pnl()
+            if not stats:
+                return {}
+            
+            # Use trade P&L values for risk calculations
+            activities = self.api.get_activities(activity_types='FILL')
+            today_activities_direct = [a for a in activities if a.transaction_time.date() == date.today()]
+            
+            if not today_activities_direct:
+                return {}
+            
+            # Get individual trade P&L values (same logic as statistical analysis)
+            today_trades_data = []
+            for activity in today_activities_direct:
+                today_trades_data.append({
+                    'symbol': activity.symbol,
+                    'side': activity.side,
+                    'qty': float(activity.qty),
+                    'price': float(activity.price)
+                })
+            
+            # Calculate trade P&L values
+            buys_today = {}
+            sells_today = {}
+            
+            for trade in today_trades_data:
+                symbol = trade['symbol']
+                side = trade['side']
+                qty = trade['qty']
+                price = trade['price']
+                
+                if side == 'buy':
+                    if symbol not in buys_today:
+                        buys_today[symbol] = []
+                    buys_today[symbol].append((qty, price))
+                else:
+                    if symbol not in sells_today:
+                        sells_today[symbol] = []
+                    sells_today[symbol].append((qty, price))
+            
+            trade_pnl_values = []
+            for symbol in sells_today:
+                if symbol in buys_today:
+                    buy_queue = buys_today[symbol][:]
+                    for sell_qty, sell_price in sells_today[symbol]:
+                        remaining_sell = sell_qty
+                        trade_pnl = 0
+                        
+                        while remaining_sell > 0 and buy_queue:
+                            buy_qty, buy_price = buy_queue[0]
+                            match_qty = min(remaining_sell, buy_qty)
+                            pnl = match_qty * (sell_price - buy_price)
+                            trade_pnl += pnl
+                            
+                            remaining_sell -= match_qty
+                            buy_queue[0] = (buy_qty - match_qty, buy_price)
+                            if buy_queue[0][0] == 0:
+                                buy_queue.pop(0)
+                        
+                        trade_pnl_values.append(trade_pnl)
+            
+            if not trade_pnl_values:
+                return {}
+            
+            import numpy as np
+            
+            # Calculate risk metrics
+            pnl_array = np.array(trade_pnl_values)
+            
+            # Sharpe Ratio
+            sharpe_ratio = (np.mean(pnl_array) / np.std(pnl_array)) if np.std(pnl_array) > 0 else 0
+            
+            # Maximum Drawdown
+            cumulative_pnl = np.cumsum(pnl_array)
+            running_max = np.maximum.accumulate(cumulative_pnl)
+            drawdowns = cumulative_pnl - running_max
+            max_drawdown = np.min(drawdowns)
+            
+            # VaR at 95% confidence
+            var_95 = np.percentile(pnl_array, 5)
+            
+            # Expected Shortfall
+            expected_shortfall = np.mean(pnl_array[pnl_array <= var_95]) if len(pnl_array[pnl_array <= var_95]) > 0 else 0
+            
+            return {
+                'sharpe_ratio': sharpe_ratio,
+                'max_drawdown': max_drawdown,
+                'var_95': var_95,
+                'expected_shortfall': expected_shortfall,
+                'volatility': np.std(pnl_array)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in corrected risk metrics: {e}")
             return {}
 
     def _filter_pnl_for_today_closes(self, df_with_pnl, today_date):
