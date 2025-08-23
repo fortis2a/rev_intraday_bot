@@ -4,10 +4,10 @@ Check Alpaca P&L for 8/20/25
 Since 8/20 data is available, let's get the actual P&L
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import date
+from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -15,6 +15,7 @@ sys.path.insert(0, str(project_root))
 
 from alpaca_pnl_fetcher import AlpacaPnLFetcher
 from update_database_schema import update_with_alpaca_pnl
+
 
 def check_today_pnl():
     """Check and update today's P&L data"""

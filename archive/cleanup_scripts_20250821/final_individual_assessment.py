@@ -5,8 +5,9 @@ THOROUGH ANALYSIS - Check each file for purpose, overlap, and current relevance
 """
 
 import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def analyze_individual_files():
     """Detailed analysis of each remaining file"""

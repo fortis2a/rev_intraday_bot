@@ -2,7 +2,9 @@
 """Check positions vs orders"""
 
 from alpaca.trading.client import TradingClient
+
 from config import ALPACA_API_KEY, ALPACA_SECRET_KEY
+
 
 def check_positions_and_orders():
     client = TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=True)

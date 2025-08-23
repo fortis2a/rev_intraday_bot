@@ -4,14 +4,15 @@ Interactive Streamlit Dashboard for Scalping Bot
 Real-time trading analytics with live data updates and interactive controls
 """
 
-import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
-import pandas as pd
-from datetime import datetime, timedelta
-import sys
 import os
+import sys
 import time
+from datetime import datetime, timedelta
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
 
 # Add path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

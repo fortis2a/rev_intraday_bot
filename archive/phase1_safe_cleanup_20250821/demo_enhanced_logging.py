@@ -6,10 +6,10 @@ Demonstrates the enhanced trade decision logging and analysis capabilities.
 Shows what information will be captured when the bot executes trades.
 """
 
-import sys
-from pathlib import Path
-from datetime import datetime
 import json
+import sys
+from datetime import datetime
+from pathlib import Path
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))

@@ -3,12 +3,14 @@
 Quick script to check current positions and test trailing stop functionality
 """
 
-import sys
 import os
+import sys
+
 sys.path.append('.')
 
 from core.data_manager import DataManager
 from core.trailing_stop_manager import TrailingStopManager
+
 
 def main():
     print("=== Position Status Check ===")

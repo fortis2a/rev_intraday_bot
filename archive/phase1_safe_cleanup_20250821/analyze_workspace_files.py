@@ -4,9 +4,10 @@ Workspace File Analysis Tool
 Categorizes files by importance and usage to identify candidates for archiving
 """
 
-from pathlib import Path
 import os
 from datetime import datetime
+from pathlib import Path
+
 
 def analyze_workspace_files():
     """Analyze all files in the workspace and categorize them"""

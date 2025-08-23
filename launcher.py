@@ -4,13 +4,14 @@ Intraday Trading Bot Launcher
 ASCII-only, no Unicode characters
 """
 
-import subprocess
-import time
 import os
 import signal
+import subprocess
+import threading
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
-import threading
+
 from utils.logger import setup_logger
 
 
@@ -107,8 +108,9 @@ class TradingLauncher:
 
                 if next_open_str and next_open_str != "None":
                     try:
-                        import pytz
                         from datetime import datetime
+
+                        import pytz
 
                         # Parse the next open time
                         if "+" in next_open_str or "Z" in next_open_str:
@@ -570,8 +572,8 @@ while True:
                     print("[INFO] 📁 Reports saved to: reports/[today]/")
 
                     # Try to open dashboard
-                    from datetime import datetime
                     import webbrowser
+                    from datetime import datetime
                     from pathlib import Path
 
                     today = datetime.now().strftime("%Y-%m-%d")

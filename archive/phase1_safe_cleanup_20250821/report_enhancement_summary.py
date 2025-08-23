@@ -4,8 +4,8 @@ Report Enhancement Comparison Tool
 Shows the evolution from static to dynamic reporting capabilities
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 

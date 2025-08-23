@@ -13,10 +13,10 @@ This script monitors the trading bot in real-time and displays:
 Run this in a separate terminal while the bot is running.
 """
 
-import time
 import os
-from datetime import datetime
 import subprocess
+import time
+from datetime import datetime
 from pathlib import Path
 
 

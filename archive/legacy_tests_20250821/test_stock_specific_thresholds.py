@@ -10,14 +10,14 @@ from pathlib import Path
 # Add parent directory to path to access main modules
 sys.path.append(str(Path(__file__).parent.parent))
 
-from stock_specific_config import (
-    get_stock_thresholds,
-    get_position_size_multiplier,
-    get_confidence_adjustment,
-    print_stock_analysis_summary,
-    STOCK_SPECIFIC_THRESHOLDS,
-)
 from config import config
+from stock_specific_config import (
+    STOCK_SPECIFIC_THRESHOLDS,
+    get_confidence_adjustment,
+    get_position_size_multiplier,
+    get_stock_thresholds,
+    print_stock_analysis_summary,
+)
 
 
 def test_stock_specific_implementation():

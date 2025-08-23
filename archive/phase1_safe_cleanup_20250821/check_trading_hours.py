@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Check Trading Hours Status"""
 
-from datetime import datetime
 import sys
+from datetime import datetime
+
 sys.path.append('.')
-from config import TRADING_START, TRADING_END
+from config import TRADING_END, TRADING_START
 
 now = datetime.now()
 current_time = now.strftime('%H:%M')

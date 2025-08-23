@@ -4,11 +4,11 @@ Update Database Schema for Alpaca P&L
 Add trading_pnl column and update with Alpaca's actual P&L data
 """
 
+import os
 import sqlite3
 import sys
-import os
-from pathlib import Path
 from datetime import date
+from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent

@@ -3,18 +3,19 @@ Real-time Alpaca API integration for Command Center
 Handles live account data, positions, and market data
 """
 
-import requests
+import asyncio
 import json
-import time
+import logging
 import threading
+import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import logging
-from dataclasses import dataclass
-import asyncio
+
 import aiohttp
-import websocket
 import pandas as pd
+import requests
+import websocket
 
 try:
     from config import config
@@ -484,8 +485,9 @@ class AlpacaRealTimeConnector:
 
         try:
             # Use direct Alpaca API client for simple P&L access
-            from alpaca.trading.client import TradingClient
             import os
+
+            from alpaca.trading.client import TradingClient
 
             client = TradingClient(
                 api_key=os.getenv("ALPACA_API_KEY"),
@@ -509,8 +511,8 @@ class AlpacaRealTimeConnector:
             cutoff_str = cutoff_time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
             # Get recent orders (Alpaca uses different parameter names)
-            from alpaca.trading.requests import GetOrdersRequest
             from alpaca.trading.enums import QueryOrderStatus
+            from alpaca.trading.requests import GetOrdersRequest
 
             request = GetOrdersRequest(
                 status=QueryOrderStatus.CLOSED,  # Use CLOSED for filled orders

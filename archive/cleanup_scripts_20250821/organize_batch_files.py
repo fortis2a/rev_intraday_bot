@@ -6,8 +6,9 @@ Group .bat files with similar purposes together
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def organize_batch_files():
     """Organize batch files into functional subdirectories"""

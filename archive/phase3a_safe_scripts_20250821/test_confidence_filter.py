@@ -3,15 +3,15 @@
 Test the 75% confidence filter for the new budget-friendly watchlist
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from stock_specific_config import (
     calculate_final_confidence,
-    meets_confidence_threshold,
     get_filtered_watchlist,
+    meets_confidence_threshold,
 )
 
 

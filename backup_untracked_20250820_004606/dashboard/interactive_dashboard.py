@@ -4,20 +4,21 @@ Interactive Trading Dashboard using Plotly/Dash
 Real-time trading analysis with interactive charts and filters
 """
 
-import dash
-from dash import dcc, html, Input, Output, callback
-import plotly.graph_objects as go
-import plotly.express as px
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import dash_bootstrap_components as dbc
-from pathlib import Path
-import alpaca_trade_api as tradeapi
 import os
+import warnings
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import alpaca_trade_api as tradeapi
+import dash
+import dash_bootstrap_components as dbc
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from dash import Input, Output, callback, dcc, html
 from dotenv import load_dotenv
 from scipy.stats import norm
-import warnings
 
 warnings.filterwarnings("ignore")
 

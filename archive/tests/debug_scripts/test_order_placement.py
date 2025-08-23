@@ -3,8 +3,8 @@
 Debug script to test order placement for symbols that pass confidence
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 

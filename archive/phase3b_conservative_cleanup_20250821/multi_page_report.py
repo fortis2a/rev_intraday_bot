@@ -4,12 +4,13 @@ Multi-Page Trading Report Generator
 Creates separate pages for overall summary and individual trading days
 """
 
-import sys
 import os
-from datetime import datetime, timedelta, date
-import pandas as pd
-import numpy as np
+import sys
+from datetime import date, datetime, timedelta
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 

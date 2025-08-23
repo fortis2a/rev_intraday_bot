@@ -4,20 +4,23 @@ Today's Trading Performance Analysis - Quick Daily Summary
 Generates a comprehensive end-of-day analysis for today's trading session
 """
 
-import sys
 import os
-from datetime import datetime, date, timedelta
-import pandas as pd
-import numpy as np
+import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 import alpaca_trade_api as tradeapi
+
 from config import config
 from utils.logger import setup_logger
+
 
 class TodayAnalysis:
     """Generate today's trading performance analysis"""

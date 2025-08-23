@@ -4,10 +4,11 @@ Manual Position Protection
 Direct protection orders for current profitable positions
 """
 
+import logging
 import os
 import sys
-import logging
 from datetime import datetime
+
 import alpaca_trade_api as tradeapi
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

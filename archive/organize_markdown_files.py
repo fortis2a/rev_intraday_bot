@@ -6,8 +6,9 @@ Move scattered .md files from root into properly organized docs structure
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def organize_markdown_files():
     """Organize markdown files into the docs folder with proper categorization"""

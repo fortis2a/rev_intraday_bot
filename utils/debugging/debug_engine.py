@@ -6,6 +6,7 @@ Debug script to check engine status and configuration
 from config import config
 from core.data_manager import DataManager
 
+
 def main():
     print("=== ENGINE DEBUG DIAGNOSTICS ===")
     

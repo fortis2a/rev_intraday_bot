@@ -3,9 +3,10 @@
 
 import os
 from datetime import datetime, timedelta
+
+import alpaca_trade_api as tradeapi
 import pandas as pd
 from dotenv import load_dotenv
-import alpaca_trade_api as tradeapi
 
 # Load environment variables
 load_dotenv()

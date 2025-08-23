@@ -4,15 +4,16 @@ Real-time Trading System Status Monitor
 Live terminal display with auto-refresh every 10 seconds
 """
 
+import json
 import os
+import sqlite3
 import sys
 import time
-import json
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Dict
+
 import psutil
-from typing import Dict, Any
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -20,6 +21,7 @@ sys.path.insert(0, str(project_root))
 
 try:
     from alpaca.trading.client import TradingClient
+
     from config import ALPACA_API_KEY, ALPACA_SECRET_KEY
 except ImportError:
     print("⚠️  Warning: Could not import Alpaca or config")

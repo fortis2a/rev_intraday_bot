@@ -11,11 +11,13 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 import time
-from config import config
+
 from data_manager import DataManager
-from order_manager import OrderManager
-from core.trailing_stop_manager import TrailingStopManager
 from logger import setup_logger
+from order_manager import OrderManager
+
+from config import config
+from core.trailing_stop_manager import TrailingStopManager
 
 
 def test_trailing_stop_system():

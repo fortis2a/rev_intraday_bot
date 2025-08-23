@@ -4,9 +4,10 @@ Basic configuration and import tests
 Tests that essential modules can be imported and basic configuration is valid
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -114,8 +115,8 @@ class TestBasicFunctionality:
     def test_import_reporting_modules(self):
         """Test importing reporting modules"""
         try:
-            from reporting.today_analysis import TodayAnalysis
             from reporting.generate_todays_pnl import generate_todays_pnl_report
+            from reporting.today_analysis import TodayAnalysis
 
             assert all([TodayAnalysis, generate_todays_pnl_report])
         except ImportError as e:

@@ -10,10 +10,11 @@ from pathlib import Path
 # Add parent directory to path to access main modules
 sys.path.append(str(Path(__file__).parent.parent))
 
-from config import config
 from data_manager import DataManager
-from strategies import MomentumStrategy, MeanReversionStrategy, VWAPStrategy
 from logger import setup_logger
+
+from config import config
+from strategies import MeanReversionStrategy, MomentumStrategy, VWAPStrategy
 
 
 def test_confidence_filter():

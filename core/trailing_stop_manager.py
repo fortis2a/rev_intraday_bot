@@ -4,12 +4,12 @@ Trailing Stop Manager
 Handles dynamic stop loss adjustments to protect profits
 """
 
-import time
-from datetime import datetime
-from typing import Dict, Optional, List
-from dataclasses import dataclass
 import sys
+import time
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Optional
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -17,8 +17,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from config import config
 from utils.logger import setup_logger
 from utils.price_utils import (
-    round_to_cent,
     calculate_trailing_stop_price,
+    round_to_cent,
     validate_price_precision,
 )
 

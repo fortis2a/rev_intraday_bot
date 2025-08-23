@@ -7,9 +7,10 @@ Check if the trading engine is working properly and identify configuration issue
 import sys
 import time
 from datetime import datetime
+
 from config import config, validate_config
-from utils.logger import setup_logger
 from core.data_manager import DataManager
+from utils.logger import setup_logger
 
 
 def run_diagnostics():

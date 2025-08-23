@@ -4,10 +4,11 @@ Integration tests for the trading system
 Tests basic system integration without requiring live API connections
 """
 
-import pytest
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -64,8 +65,8 @@ class TestSystemIntegration:
     def test_reporting_system_import(self):
         """Test reporting system imports"""
         try:
-            from reporting.today_analysis import TodayAnalysis
             from reporting.generate_todays_pnl import generate_todays_pnl_report
+            from reporting.today_analysis import TodayAnalysis
 
             assert TodayAnalysis.__name__ == "TodayAnalysis"
             assert generate_todays_pnl_report.__name__ == "generate_todays_pnl_report"

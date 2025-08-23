@@ -52,9 +52,9 @@ I recommend creating a comprehensive real-time monitor that combines:
 This would be a single dashboard/window that shows EVERYTHING in real-time.
 """
 
+import os
 import sys
 import time
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List

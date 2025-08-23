@@ -2,9 +2,9 @@
 Signal types for trading system
 """
 
-from datetime import datetime
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 
 @dataclass

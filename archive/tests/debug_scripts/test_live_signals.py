@@ -2,10 +2,13 @@
 """
 Test if live signals are being generated in real-time
 """
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+import logging
+import time
 
 from config import config
 from core.data_manager import DataManager
@@ -13,8 +16,6 @@ from strategies.mean_reversion import MeanReversionStrategy
 from strategies.momentum_scalp import MomentumScalpStrategy
 from strategies.vwap_bounce import VWAPBounceStrategy
 from utils.logger import setup_logger
-import logging
-import time
 
 
 def test_live_signals():

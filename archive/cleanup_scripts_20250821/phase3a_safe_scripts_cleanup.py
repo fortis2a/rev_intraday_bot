@@ -6,8 +6,9 @@ SAFE EXECUTION - These files are clearly safe to archive
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def phase3a_safe_cleanup():
     """Execute Phase 3A cleanup - archive clearly safe files from scripts/"""

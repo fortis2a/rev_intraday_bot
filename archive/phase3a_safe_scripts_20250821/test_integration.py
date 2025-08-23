@@ -3,8 +3,8 @@
 Test script for real data integration in Command Center
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add project root to path
@@ -57,7 +57,7 @@ def test_imports():
 
     # Test Command Center import
     try:
-        from scalping_command_center import ScalpingCommandCenter, HAS_REAL_INTEGRATION
+        from scalping_command_center import HAS_REAL_INTEGRATION, ScalpingCommandCenter
 
         print("✅ ScalpingCommandCenter imported successfully")
         print(f"✅ Real data integration available: {HAS_REAL_INTEGRATION}")

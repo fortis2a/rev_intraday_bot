@@ -6,8 +6,9 @@ CONSERVATIVE APPROACH - Only archive files that are clearly outdated
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def phase3b_conservative_cleanup():
     """Execute Phase 3B conservative cleanup"""

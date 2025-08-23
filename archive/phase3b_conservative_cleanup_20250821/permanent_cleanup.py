@@ -5,11 +5,11 @@ Prevents VS Code auto-restore by using proper git commands
 Can be re-run safely to maintain clean workspace
 """
 
-import os
-import subprocess
-import shutil
-from pathlib import Path
 import json
+import os
+import shutil
+import subprocess
+from pathlib import Path
 
 
 class WorkspaceCleanup:

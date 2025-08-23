@@ -6,6 +6,7 @@ Quick script to close all positions immediately
 
 import sys
 from pathlib import Path
+
 import alpaca_trade_api as tradeapi
 
 # Add project root to path

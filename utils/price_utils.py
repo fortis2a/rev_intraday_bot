@@ -4,8 +4,8 @@ Price Utilities
 Handles proper price rounding to eliminate floating-point precision errors
 """
 
-from decimal import Decimal, ROUND_HALF_UP
 import math
+from decimal import ROUND_HALF_UP, Decimal
 
 
 def round_to_cent(price: float) -> float:

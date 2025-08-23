@@ -3,8 +3,10 @@
 Quick script to check recent Alpaca trades
 """
 
-from core.data_manager import DataManager
 from datetime import datetime, timedelta
+
+from core.data_manager import DataManager
+
 
 def check_recent_trades():
     dm = DataManager()

@@ -5,8 +5,9 @@ Shows exactly what files would be protected vs removed during cleanup
 """
 
 import os
-from pathlib import Path
 import re
+from pathlib import Path
+
 
 class FileProtectionAnalyzer:
     def __init__(self):

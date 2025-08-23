@@ -8,8 +8,8 @@ Identifies where signals are getting lost in the pipeline.
 """
 
 import os
-import time
 import subprocess
+import time
 from datetime import datetime
 
 

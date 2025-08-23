@@ -3,8 +3,8 @@
 Close All Positions Script
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add current directory to Python path
@@ -16,8 +16,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import alpaca_trade_api as tradeapi
 from datetime import datetime
+
+import alpaca_trade_api as tradeapi
 
 
 def close_all_positions():

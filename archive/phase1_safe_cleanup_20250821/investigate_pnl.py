@@ -4,10 +4,11 @@ P&L Investigation - Compare Cash Flow vs Alpaca Net P&L
 Understanding the difference between our calculation and Alpaca's actual P&L
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import date, timedelta
+from pathlib import Path
+
 import alpaca_trade_api as tradeapi
 from dotenv import load_dotenv
 
@@ -19,6 +20,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from database.trading_db import TradingDatabase
+
 
 def investigate_pnl_difference():
     """Compare our cash flow calculation vs Alpaca's actual P&L"""

@@ -4,19 +4,21 @@ Advanced Market Analysis Report - Enhanced for 8/20
 Deep-dive analysis with position tracking, strategy performance, and risk assessment
 """
 
-import sys
-import os
-from pathlib import Path
-from datetime import date, datetime, timedelta
-import pandas as pd
 import json
 import logging
+import os
+import sys
+from datetime import date, datetime, timedelta
+from pathlib import Path
+
+import pandas as pd
 
 # Add project root to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from database.trading_db import TradingDatabase
+
 
 class AdvancedMarketAnalyzer:
     """Advanced market analysis with enhanced reporting for 8/20"""

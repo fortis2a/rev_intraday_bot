@@ -4,21 +4,21 @@ Test script for real Alpaca trade data integration
 Run this to verify the Command Center can pull real trade data
 """
 
-import sys
 import asyncio
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 try:
+    from config import config
     from scripts.alpaca_connector import (
         alpaca_connector,
-        get_real_trade_history,
         get_real_strategy_performance,
+        get_real_trade_history,
     )
-    from config import config
 
     print("✅ Imports successful")
 except ImportError as e:

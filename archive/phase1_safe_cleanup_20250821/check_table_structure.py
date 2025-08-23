@@ -4,6 +4,7 @@
 import sqlite3
 from pathlib import Path
 
+
 def check_table_structure():
     db_path = Path("data/trading.db")
     

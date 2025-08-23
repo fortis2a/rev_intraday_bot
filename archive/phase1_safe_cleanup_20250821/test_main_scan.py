@@ -3,13 +3,13 @@
 Test signal scanning exactly like main.py does it
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from main import IntradayEngine
 from config import config
+from main import IntradayEngine
 
 
 def test_main_scan():

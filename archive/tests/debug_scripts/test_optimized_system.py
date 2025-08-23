@@ -8,11 +8,12 @@ Tests the unified indicator service and optimized strategies to ensure:
 4. Performance improvements from unified calculations
 """
 
-import pandas as pd
-import numpy as np
-import yfinance as yf
-from datetime import datetime, timedelta
 import time
+from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
+import yfinance as yf
 
 # Test imports
 from strategies.mean_reversion import MeanReversionStrategy

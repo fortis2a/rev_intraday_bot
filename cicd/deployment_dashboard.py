@@ -4,10 +4,11 @@ Deployment Dashboard - Monitor CI/CD Pipeline Status
 """
 
 import json
-import requests
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import requests
 
 
 class DeploymentDashboard:

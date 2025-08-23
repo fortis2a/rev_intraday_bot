@@ -5,9 +5,9 @@ Live monitoring of confidence signals for all watchlist stocks
 Shows which stocks exceed the 75% trading threshold
 """
 
+import os
 import sys
 import time
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -15,8 +15,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from config import config
-from stock_specific_config import should_execute_trade, get_stock_thresholds
 from core.real_time_confidence import RealTimeConfidenceCalculator
+from stock_specific_config import get_stock_thresholds, should_execute_trade
 from utils.logger import setup_logger
 
 

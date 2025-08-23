@@ -3,13 +3,16 @@
 Verify actual Alpaca trade activities vs report data
 """
 
-import sys
 import os
-from datetime import datetime, date, timedelta
+import sys
+from datetime import date, datetime, timedelta
+
 sys.path.append('.')
 
-from config import config
 import alpaca_trade_api as tradeapi
+
+from config import config
+
 
 def get_actual_alpaca_activities():
     """Get actual activities from Alpaca API"""

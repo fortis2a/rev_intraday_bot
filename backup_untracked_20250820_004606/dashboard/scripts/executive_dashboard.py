@@ -4,14 +4,15 @@ Executive Dashboard Generator
 Creates a focused executive summary chart with key performance metrics
 """
 
-import sys
 import os
+import sys
 from datetime import datetime
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 # Add the parent directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

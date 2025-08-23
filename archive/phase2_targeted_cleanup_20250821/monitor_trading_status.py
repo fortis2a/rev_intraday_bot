@@ -4,8 +4,8 @@ Real-time Trading Engine Status Monitor
 Shows live status and alerts you to problems
 """
 
-import time
 import os
+import time
 from datetime import datetime, timedelta
 
 

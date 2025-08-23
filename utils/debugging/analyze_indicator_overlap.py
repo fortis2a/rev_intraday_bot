@@ -5,6 +5,7 @@ Identifies duplicated indicators and potential signal conflicts
 """
 
 import sys
+
 sys.path.append(".")
 
 def analyze_indicator_overlap():

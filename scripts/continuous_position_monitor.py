@@ -4,12 +4,14 @@ Continuous Position Monitor
 Monitors all positions and adjusts protection in real-time
 """
 
+import logging
 import os
 import sys
 import time
-import logging
 from datetime import datetime
+
 import alpaca_trade_api as tradeapi
+
 from stock_specific_config import get_stock_thresholds
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

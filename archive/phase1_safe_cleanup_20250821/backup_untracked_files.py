@@ -4,11 +4,11 @@ Backup Untracked Files Script
 Creates a timestamped backup of all untracked files in the repository
 """
 
+import json
 import os
 import shutil
 import subprocess
 from datetime import datetime
-import json
 
 
 def get_untracked_files():

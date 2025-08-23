@@ -6,8 +6,9 @@ COMPLETION CLEANUP - Remove the temporary cleanup scripts we created today
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def final_root_cleanup():
     """Archive the 7 maintenance/cleanup scripts from today"""

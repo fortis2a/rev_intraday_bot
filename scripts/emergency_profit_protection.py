@@ -4,11 +4,13 @@ Emergency Profit Protection System
 Protects unrealized profits for both long and short positions
 """
 
+import logging
 import os
 import sys
-import logging
 from datetime import datetime
+
 import alpaca_trade_api as tradeapi
+
 from stock_specific_config import get_stock_thresholds
 
 # Add current directory to path for imports

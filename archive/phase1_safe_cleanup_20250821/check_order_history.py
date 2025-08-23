@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Check Complete Order History"""
 
-from alpaca.trading.client import TradingClient
-from config import ALPACA_API_KEY, ALPACA_SECRET_KEY
 from datetime import datetime, timedelta
+
+from alpaca.trading.client import TradingClient
+
+from config import ALPACA_API_KEY, ALPACA_SECRET_KEY
 
 # Connect to Alpaca
 client = TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=True)

@@ -4,14 +4,15 @@ Verify Actual Trades Script
 Check what actual trades are being pulled for the dashboard
 """
 
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
 
 # Add the parent directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.data_manager import DataManager
+
 
 def verify_actual_trades():
     """Verify what actual trades exist"""

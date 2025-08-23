@@ -6,8 +6,9 @@ MAJOR CLEANUP OPPORTUNITY - 57 files to review and organize
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
+
 
 def analyze_scripts_directory():
     """Analyze all Python files in the scripts/ directory"""

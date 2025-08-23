@@ -3,10 +3,11 @@
 Check Alpaca Account P&L - Get actual trading performance
 """
 
-import sys
 import os
+import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from datetime import date, timedelta, datetime
+
 import alpaca_trade_api as tradeapi
 from dotenv import load_dotenv
 

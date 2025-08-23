@@ -4,10 +4,10 @@ Test price rounding utilities to ensure they fix sub-penny precision errors
 """
 
 from utils.price_utils import (
-    round_to_cent,
     calculate_stop_loss_price,
     calculate_take_profit_price,
     calculate_trailing_stop_price,
+    round_to_cent,
     validate_price_precision,
 )
 

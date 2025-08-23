@@ -8,6 +8,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+
 def create_backup():
     """Create backup of today's new files"""
     print("🔄 Creating backup of today's new files...")

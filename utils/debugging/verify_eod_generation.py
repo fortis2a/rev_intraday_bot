@@ -11,18 +11,18 @@ This script demonstrates and verifies that:
 Run this to test EOD functionality.
 """
 
-import sys
-import os
-from pathlib import Path
-from datetime import datetime
 import csv
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
 
 # Add current directory to path
 sys.path.append(".")
 
+import config
 from core.intraday_engine import IntradayEngine
 from utils.trade_record import TradeRecord
-import config
 
 
 def main():

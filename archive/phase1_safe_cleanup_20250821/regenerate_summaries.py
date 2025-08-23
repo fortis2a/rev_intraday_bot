@@ -4,10 +4,10 @@ Regenerate Database Summaries with Enhanced P&L
 Update existing daily summaries to include trading P&L
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import date
+from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent

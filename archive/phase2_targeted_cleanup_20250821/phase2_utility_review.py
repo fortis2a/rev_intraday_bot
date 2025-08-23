@@ -5,8 +5,9 @@ CAREFUL REVIEW - These files need individual assessment before archiving
 """
 
 import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def analyze_remaining_files():
     """Analyze remaining Python files in root directory"""

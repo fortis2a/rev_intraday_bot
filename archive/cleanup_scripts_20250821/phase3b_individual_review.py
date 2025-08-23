@@ -6,8 +6,9 @@ CAREFUL REVIEW - Individual assessment of each remaining script
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
+
 
 def analyze_remaining_scripts():
     """Analyze the remaining 24 files in scripts/ directory"""

@@ -4,9 +4,9 @@ Live P&L External Monitor
 Real-time P&L monitoring in external window with enhanced display
 """
 
-import time
-import sys
 import os
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 

@@ -4,16 +4,17 @@ Trading Database Manager
 Handles storage and retrieval of trading activities from Alpaca
 """
 
-import sqlite3
-import os
-import sys
-import pandas as pd
-from datetime import datetime, date, timedelta
-from pathlib import Path
-import alpaca_trade_api as tradeapi
-from dotenv import load_dotenv
 import logging
-from typing import List, Dict, Optional, Tuple
+import os
+import sqlite3
+import sys
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import alpaca_trade_api as tradeapi
+import pandas as pd
+from dotenv import load_dotenv
 
 # Load environment
 load_dotenv()

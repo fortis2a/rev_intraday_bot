@@ -2,13 +2,14 @@
 """
 Quick test to verify real P&L values are being fetched correctly
 """
-import sys
 import os
+import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from scripts.alpaca_connector import AlpacaRealTimeConnector
 import asyncio
+
+from scripts.alpaca_connector import AlpacaRealTimeConnector
 
 
 def test_real_pnl():

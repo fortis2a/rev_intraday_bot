@@ -5,12 +5,13 @@ Automatically puts the bot to sleep at market close (4:00 PM) and wakes it up at
 Shows timer, countdown, and market status messages
 """
 
-import time
 import os
 import sys
 import threading
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
+
 import pytz
 
 # Add parent directory to path

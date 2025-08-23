@@ -54,10 +54,12 @@ ENHANCED TRADE ANALYSIS SYSTEM DESIGN
 """
 
 import json
-import pandas as pd
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import os
+
+import pandas as pd
+
 
 def analyze_current_trade_logging():
     """Analyze current trade logging capabilities"""

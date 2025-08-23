@@ -5,6 +5,7 @@ Check and Cancel Orders, then Force Close
 
 import sys
 from pathlib import Path
+
 import alpaca_trade_api as tradeapi
 
 # Add project root to path
@@ -12,6 +13,7 @@ project_root = Path(__file__).parent
 sys.path.append(str(project_root))
 
 from config import config
+
 
 def check_and_cancel_orders():
     """Check for open orders and cancel them"""

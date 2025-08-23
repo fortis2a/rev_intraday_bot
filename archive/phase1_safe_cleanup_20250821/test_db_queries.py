@@ -2,8 +2,8 @@
 """Test database connection for realtime monitor"""
 
 import sqlite3
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 
 def test_database_queries():

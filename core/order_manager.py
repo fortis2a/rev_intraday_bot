@@ -5,24 +5,26 @@ Handles trade execution and order management with stock-specific thresholds
 ASCII-only, no Unicode characters
 """
 
-import alpaca_trade_api as tradeapi
 from datetime import datetime
+
+import alpaca_trade_api as tradeapi
+
 from config import config
-from utils.logger import setup_logger, clean_message
+from core.trailing_stop_manager import TrailingStopManager
+from utils.logger import clean_message, setup_logger
 from utils.price_utils import (
-    round_to_cent,
     calculate_stop_loss_price,
     calculate_take_profit_price,
+    round_to_cent,
     validate_price_precision,
 )
-from core.trailing_stop_manager import TrailingStopManager
 
 # Import stock-specific configuration
 try:
     from stock_specific_config import (
-        get_stock_thresholds,
-        get_position_size_multiplier,
         get_confidence_adjustment,
+        get_position_size_multiplier,
+        get_stock_thresholds,
     )
 
     STOCK_SPECIFIC_AVAILABLE = True

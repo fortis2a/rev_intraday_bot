@@ -3,42 +3,43 @@ Scalping Bot Command Center - Professional Desktop GUI
 Advanced real-time monitoring with multiple panels and professional interface
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
-import tkinter.font as tkFont
-from datetime import datetime, timedelta, timezone
-import threading
-import time
 import json
+import logging
 import os
 import sys
+import threading
+import time
+import tkinter as tk
+import tkinter.font as tkFont
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from tkinter import messagebox, ttk
+from typing import Dict, List, Optional, Tuple
+
 import pandas as pd
 import requests
-from typing import Dict, List, Optional, Tuple
-import logging
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
 try:
-    from config import config, INTRADAY_WATCHLIST
-    from utils.logger import setup_logger
+    from config import INTRADAY_WATCHLIST, config
     from core.data_manager import DataManager
     from core.risk_manager import RiskManager
 
     # Import real-time integrators
     from scripts.alpaca_connector import (
         alpaca_connector,
-        start_alpaca_feed,
-        get_real_trade_history,
         get_real_strategy_performance,
+        get_real_trade_history,
+        start_alpaca_feed,
     )
     from scripts.confidence_integrator import (
         confidence_calculator,
         start_confidence_feed,
     )
-    from scripts.trade_log_parser import trade_parser, start_trade_monitoring
+    from scripts.trade_log_parser import start_trade_monitoring, trade_parser
+    from utils.logger import setup_logger
 
     SYMBOLS = INTRADAY_WATCHLIST
     ALPACA_CONFIG = {
@@ -1371,8 +1372,9 @@ class ScalpingCommandCenter:
                 self.logger.info("📊 Attempting to fetch positions from Alpaca...")
                 try:
                     # Get current positions instead of just recent trades
-                    from alpaca.trading.client import TradingClient
                     import os
+
+                    from alpaca.trading.client import TradingClient
                     from dotenv import load_dotenv
 
                     # Ensure environment is loaded
@@ -1536,8 +1538,9 @@ class ScalpingCommandCenter:
             if self.has_real_data:
                 try:
                     # Get current positions from Alpaca
-                    from alpaca.trading.client import TradingClient
                     import os
+
+                    from alpaca.trading.client import TradingClient
                     from dotenv import load_dotenv
 
                     load_dotenv()
@@ -1786,8 +1789,9 @@ class ScalpingCommandCenter:
     def fetch_bot_health(self):
         """Fetch bot health metrics"""
         try:
-            import psutil
             import random
+
+            import psutil
 
             uptime = datetime.now() - self.start_time
             uptime_str = str(uptime).split(".")[0]  # Remove microseconds

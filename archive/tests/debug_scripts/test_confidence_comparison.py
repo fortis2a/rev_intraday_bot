@@ -8,8 +8,8 @@ import sys
 
 sys.path.append(".")
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def test_confidence_systems():

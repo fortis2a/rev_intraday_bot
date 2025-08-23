@@ -4,9 +4,10 @@ Emergency Position Closer - Cancel ALL orders first, then close positions
 """
 
 import sys
-from pathlib import Path
-import alpaca_trade_api as tradeapi
 import time
+from pathlib import Path
+
+import alpaca_trade_api as tradeapi
 
 # Add project root to path
 project_root = Path(__file__).parent

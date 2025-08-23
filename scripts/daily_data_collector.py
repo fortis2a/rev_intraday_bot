@@ -4,11 +4,11 @@ Daily Data Collector - Scheduled to run at 4:15 PM
 Fetches daily trading activities and stores in database
 """
 
-import sys
-import os
-from pathlib import Path
-from datetime import date, datetime, timedelta
 import logging
+import os
+import sys
+from datetime import date, datetime, timedelta
+from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent

@@ -3,15 +3,15 @@
 Debug script to test confidence calculations for trading
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config import config
 from stock_specific_config import (
-    should_execute_trade,
     get_real_time_confidence_for_trade,
+    should_execute_trade,
 )
 
 

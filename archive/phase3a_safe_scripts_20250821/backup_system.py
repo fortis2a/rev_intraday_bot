@@ -5,14 +5,15 @@ Handles manual and scheduled backups to GitHub repository.
 Schedule: Daily at 10:00 PM (22:00)
 """
 
-import os
-import sys
-import subprocess
-import schedule
-import time
 import logging
+import os
+import subprocess
+import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import schedule
 
 # Add parent directory to path for imports
 current_dir = Path(__file__).parent

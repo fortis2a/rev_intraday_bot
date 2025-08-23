@@ -5,12 +5,14 @@ Handles market data from Alpaca API
 ASCII-only, no Unicode characters
 """
 
+import time
+from datetime import datetime, timedelta
+
 import alpaca_trade_api as tradeapi
 import pandas as pd
-from datetime import datetime, timedelta
-import time
+
 from config import config
-from utils.logger import setup_logger, clean_message
+from utils.logger import clean_message, setup_logger
 
 
 class DataManager:

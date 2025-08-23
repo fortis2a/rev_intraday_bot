@@ -6,8 +6,9 @@ Group similar functionality together for better workspace organization
 
 import os
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 
 def organize_by_function():
     """Organize files into functional subdirectories"""

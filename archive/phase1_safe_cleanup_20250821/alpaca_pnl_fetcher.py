@@ -5,12 +5,13 @@ Get actual P&L data directly from Alpaca's portfolio history
 This is the source of truth, includes commissions/fees
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import date, datetime, timedelta
-import pandas as pd
+from pathlib import Path
+
 import alpaca_trade_api as tradeapi
+import pandas as pd
 from dotenv import load_dotenv
 
 # Load environment

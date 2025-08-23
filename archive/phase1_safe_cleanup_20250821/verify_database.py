@@ -4,10 +4,11 @@ Database Verification Script
 Compare database cached data vs direct API calls
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import date, timedelta
+from pathlib import Path
+
 import pandas as pd
 
 # Add project root to path
@@ -15,6 +16,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from database.trading_db import TradingDatabase
+
 
 def verify_database_accuracy():
     """Verify database data matches API data"""

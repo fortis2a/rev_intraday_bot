@@ -3,7 +3,7 @@
 Test for the specific precision error that was occurring
 """
 
-from utils.price_utils import round_to_cent, calculate_stop_loss_price
+from utils.price_utils import calculate_stop_loss_price, round_to_cent
 
 
 def test_specific_error():

@@ -3,12 +3,13 @@ Intraday Stock Finder and Analyzer
 Finds stocks under $100 suitable for intraday trading with heavy volume and optimal volatility
 """
 
-import yfinance as yf
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
 import time
 import warnings
+from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
+import yfinance as yf
 
 warnings.filterwarnings("ignore")
 

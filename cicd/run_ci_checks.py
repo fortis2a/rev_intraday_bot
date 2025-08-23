@@ -4,14 +4,9 @@ CI/CD Helper Script - Local Testing
 Run the same checks that CI/CD will run, locally before pushing
 """
 
-import subprocess
-import sys
-from pathlib import Path
-
-
-import subprocess
-import sys
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 

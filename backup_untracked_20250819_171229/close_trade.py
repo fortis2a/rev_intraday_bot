@@ -4,10 +4,11 @@ Close Trade Script - Main Interface
 Quick and easy way to close individual stocks or all positions
 """
 
-import sys
-import os
 import argparse
+import os
+import sys
 from pathlib import Path
+
 import alpaca_trade_api as tradeapi
 
 # Add project root to path

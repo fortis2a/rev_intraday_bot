@@ -4,21 +4,22 @@ Enhanced Market Close Report Generator
 Comprehensive end-of-day analysis with narrative insights, charts, and trading recommendations
 """
 
-import sys
-import os
-from datetime import datetime, date, timedelta
-import pandas as pd
-import numpy as np
-from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
-from collections import defaultdict
 import json
+import os
+import sys
+import warnings
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from pathlib import Path
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from scipy import stats
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-import warnings
 
 warnings.filterwarnings("ignore")
 
@@ -27,6 +28,7 @@ project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 import alpaca_trade_api as tradeapi
+
 from config import config
 from utils.logger import setup_logger
 

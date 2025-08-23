@@ -3,15 +3,16 @@
 Test signal generation for debugging
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from core.data_manager import DataManager
-from strategies import MomentumStrategy, MeanReversionStrategy
-from config import config
 import pandas as pd
+
+from config import config
+from core.data_manager import DataManager
+from strategies import MeanReversionStrategy, MomentumStrategy
 
 
 def test_signal_generation():

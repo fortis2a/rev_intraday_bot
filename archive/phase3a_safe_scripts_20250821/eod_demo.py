@@ -4,19 +4,21 @@ EOD Analysis Demo - Shows comprehensive analysis with sample data
 Demonstrates all charts and reports that would be generated with real trades
 """
 
-import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
+
 import matplotlib
+import numpy as np
+import pandas as pd
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
-from pathlib import Path
 import warnings
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+import seaborn as sns
+from plotly.subplots import make_subplots
 
 warnings.filterwarnings("ignore")
 

@@ -4,15 +4,16 @@ Live Interactive Dashboard - Enhanced Dynamic Reporting System
 Real-time updates, interactive charts, advanced analytics with database cache
 """
 
-import sys
-import os
-from pathlib import Path
-from datetime import date, datetime, timedelta
-import pandas as pd
 import json
-import sqlite3
-from typing import Dict, List, Any
 import logging
+import os
+import sqlite3
+import sys
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List
+
+import pandas as pd
 
 # Add project root to path
 project_root = Path(__file__).parent.parent

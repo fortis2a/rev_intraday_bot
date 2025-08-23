@@ -12,9 +12,9 @@ This script will:
 Run this script whenever VS Code reverts to unorganized state.
 """
 
+import json
 import os
 import shutil
-import json
 from pathlib import Path
 
 

@@ -4,8 +4,8 @@ End-of-Day Analysis Script
 Wrapper for the comprehensive market close report generator
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add project root to path
@@ -14,6 +14,7 @@ sys.path.append(str(project_root))
 
 # Import the comprehensive market close report generator
 from market_close_report import MarketCloseReportGenerator
+
 
 def main():
     """Main EOD analysis function"""

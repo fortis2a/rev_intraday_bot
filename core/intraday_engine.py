@@ -4,30 +4,31 @@
 Swing trading engine for 15-minute timeframes with 2-8 hour holds
 """
 
-import sys
-import time
-import threading
-import pandas as pd
-import numpy as np
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
-import logging
 import csv
+import logging
+import sys
+import threading
+import time
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
 import pytz
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from config import config, validate_config
-from utils.signal_types import ScalpingSignal
-from core.risk_manager import RiskManager
 from core.data_manager import DataManager
 from core.order_manager import OrderManager
-from utils.trade_record import TradeRecord
-from strategies import MomentumStrategy, MeanReversionStrategy, VWAPStrategy
+from core.risk_manager import RiskManager
+from strategies import MeanReversionStrategy, MomentumStrategy, VWAPStrategy
 from utils.logger import setup_logger
+from utils.signal_types import ScalpingSignal
+from utils.trade_record import TradeRecord
 
 # (Moved ScalpingSignal to utils.signal_types)
 
@@ -261,7 +262,8 @@ class IntradayEngine:
             if hasattr(ts, "to_pydatetime"):
                 ts = ts.to_pydatetime()
             # Assume datetime-like
-            from datetime import timezone as _tz, datetime as _dt
+            from datetime import datetime as _dt
+            from datetime import timezone as _tz
 
             if getattr(ts, "tzinfo", None) is None:
                 ts = ts.replace(tzinfo=_tz.utc)

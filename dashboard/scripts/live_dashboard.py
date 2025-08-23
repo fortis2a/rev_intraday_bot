@@ -8,6 +8,7 @@ import os
 import sys
 import time
 from datetime import datetime
+
 import alpaca_trade_api as tradeapi
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

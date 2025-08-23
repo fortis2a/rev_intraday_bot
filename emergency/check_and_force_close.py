@@ -11,9 +11,11 @@ project_root = Path(__file__).parent
 sys.path.append(str(project_root))
 
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest, OrderSide, TimeInForce
 from alpaca.trading.enums import OrderStatus
+from alpaca.trading.requests import MarketOrderRequest, OrderSide, TimeInForce
+
 from config import ALPACA_API_KEY, ALPACA_SECRET_KEY
+
 
 def check_and_force_close():
     """Check recent orders and force close positions"""

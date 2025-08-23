@@ -4,14 +4,15 @@ Interactive Plotly Dash Dashboard for Scalping Bot
 Professional web-based dashboard with real-time updates
 """
 
-import dash
-from dash import dcc, html, Input, Output, dash_table, callback
-import plotly.graph_objects as go
-import plotly.express as px
-import pandas as pd
-from datetime import datetime, timedelta
-import sys
 import os
+import sys
+from datetime import datetime, timedelta
+
+import dash
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from dash import Input, Output, callback, dash_table, dcc, html
 
 # Add path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

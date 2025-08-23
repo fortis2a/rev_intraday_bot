@@ -4,9 +4,9 @@ Clean Trading Bot Starter
 Ensures only the improved intraday engine runs
 """
 
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 

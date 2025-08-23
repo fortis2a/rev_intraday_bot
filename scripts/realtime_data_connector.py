@@ -4,16 +4,17 @@ Handles live data feeds from multiple sources
 """
 
 import asyncio
-import aiohttp
-import websocket
 import json
+import logging
 import threading
 import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Callable
-import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Callable, Dict, List, Optional
+
+import aiohttp
 import requests
+import websocket
 
 
 @dataclass
@@ -364,8 +365,9 @@ class RealTimeDataConnector:
 
     def get_bot_health(self) -> Dict:
         """Get bot health metrics"""
-        import psutil
         import random
+
+        import psutil
 
         try:
             cpu_percent = psutil.cpu_percent()

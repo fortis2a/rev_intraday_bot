@@ -3,9 +3,9 @@
 Test script to automatically test launcher.py option 5 then option 1
 """
 
+import os
 import subprocess
 import sys
-import os
 import time
 from io import StringIO
 

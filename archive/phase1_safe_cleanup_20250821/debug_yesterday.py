@@ -2,9 +2,10 @@
 """Debug yesterday's data calculation"""
 
 import os
-from datetime import datetime, date, timedelta
-from dotenv import load_dotenv
+from datetime import date, datetime, timedelta
+
 import alpaca_trade_api as tradeapi
+from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()

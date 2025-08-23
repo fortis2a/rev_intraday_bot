@@ -4,17 +4,18 @@ Integrates with existing strategy confidence calculations
 """
 
 import asyncio
+import json
+import logging
 import threading
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
-import logging
 from pathlib import Path
-import json
+from typing import Dict, List, Optional, Tuple
+
 import pandas as pd
 
 try:
-    from config import config, INTRADAY_WATCHLIST
+    from config import INTRADAY_WATCHLIST, config
     from core.unified_indicators import UnifiedIndicatorService
     from strategies.mean_reversion import MeanReversionStrategy
     from strategies.momentum_scalp import MomentumScalpStrategy

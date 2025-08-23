@@ -4,8 +4,8 @@ Proper Intraday Trading Bot Startup
 Uses core.intraday_engine.IntradayEngine with proper trading hour restrictions
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add project root to path

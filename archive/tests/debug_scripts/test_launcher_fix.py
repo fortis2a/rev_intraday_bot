@@ -4,8 +4,8 @@ Test script to verify the launcher no longer auto-restarts
 """
 
 import subprocess
-import time
 import sys
+import time
 
 
 def test_launcher_no_auto_restart():

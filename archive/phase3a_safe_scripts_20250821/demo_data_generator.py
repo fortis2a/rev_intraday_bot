@@ -8,9 +8,9 @@ Creates realistic trading data that reflects actual Thursday performance:
 
 import json
 import random
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
 import uuid
+from datetime import datetime, timedelta
+from typing import Any, Dict, List
 
 
 class DemoDataGenerator:

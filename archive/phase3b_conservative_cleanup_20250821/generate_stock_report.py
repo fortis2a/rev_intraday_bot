@@ -2,14 +2,15 @@
 Run intraday stock analysis and generate comprehensive report
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.find_intraday_stocks import IntradayStockFinder
-from datetime import datetime
 import json
+from datetime import datetime
+
+from scripts.find_intraday_stocks import IntradayStockFinder
 
 
 def generate_markdown_report(results, filename):

@@ -4,14 +4,15 @@ Enhanced Executive Dashboard Generator
 Creates a focused executive summary chart with clear, intuitive visualizations
 """
 
-import sys
 import os
+import sys
 from datetime import datetime
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 # Add the parent directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,7 +51,8 @@ class EnhancedExecutiveDashboard:
     def get_trading_summary(self):
         """Get summarized trading data from ACTUAL executed trades only"""
         try:
-            from datetime import datetime, date, timedelta
+            from datetime import date, datetime, timedelta
+
             import pandas as pd
 
             self.logger.info("🔍 Checking for actual executed trades...")

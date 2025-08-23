@@ -11,20 +11,22 @@ Usage:
     python scripts/trade_analyzer.py --strategy momentum_scalp
 """
 
-import sys
 import argparse
-import pandas as pd
 import json
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import pandas as pd
+
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+import os
+
 from config import config
 from utils.logger import setup_logger
-import os
 
 
 class TradeDecisionAnalyzer:

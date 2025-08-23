@@ -11,10 +11,11 @@ This script shows multiple methods:
 5. Calculate comprehensive daily P&L summary
 """
 
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
 from decimal import Decimal
+
 import pandas as pd
 
 # Add the parent directory to sys.path for imports

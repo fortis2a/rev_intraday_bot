@@ -1,6 +1,7 @@
 
-import time
 import sys
+import time
+
 sys.path.append(".")
 from core.data_manager import DataManager
 from utils.logger import setup_logger

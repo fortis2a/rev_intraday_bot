@@ -4,8 +4,8 @@ Interactive Dashboard Options for Trading Analytics
 Demonstrates multiple Python frameworks for building interactive dashboards
 """
 
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
 
 # Add the parent directory to sys.path for imports

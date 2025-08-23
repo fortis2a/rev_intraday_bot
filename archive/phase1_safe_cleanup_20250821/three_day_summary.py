@@ -4,11 +4,11 @@ Three-Day Trading Summary
 Complete overview of 8/18, 8/19, and 8/20 trading performance
 """
 
-import sys
 import os
-from pathlib import Path
-from datetime import date
 import sqlite3
+import sys
+from datetime import date
+from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent

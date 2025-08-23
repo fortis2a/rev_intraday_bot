@@ -7,8 +7,8 @@ Monitor live trading signals, cycles, and actions with detailed output.
 """
 
 import os
-import time
 import subprocess
+import time
 from datetime import datetime
 
 

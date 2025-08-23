@@ -4,14 +4,14 @@ Integration test for real-time vs historical confidence comparison
 Shows how dynamic confidence levels change throughout the day
 """
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from stock_specific_config import (
-    get_filtered_watchlist,
     calculate_final_confidence,
+    get_filtered_watchlist,
     get_real_time_confidence_for_trade,
     should_execute_trade,
 )

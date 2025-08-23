@@ -4,8 +4,8 @@ Close Specific Trade Script
 Allows you to close a particular stock position manually
 """
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 # Add the project root to the path
