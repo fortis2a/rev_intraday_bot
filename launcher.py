@@ -316,10 +316,12 @@ while True:
         time.sleep(60)
 '''
             
-            with open('pnl_monitor.py', 'w') as f:
+            # Create temp file in utils folder to avoid workspace pollution
+            pnl_monitor_path = 'utils/temp_pnl_monitor.py'
+            with open(pnl_monitor_path, 'w') as f:
                 f.write(pnl_script)
             
-            cmd = [self.python_cmd, 'pnl_monitor.py']
+            cmd = [self.python_cmd, pnl_monitor_path]
             process = subprocess.Popen(cmd,
                                      stdout=subprocess.PIPE,
                                      stderr=subprocess.PIPE,

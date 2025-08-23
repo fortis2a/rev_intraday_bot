@@ -2,6 +2,24 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "Startup Cleanup",
+			"type": "shell",
+			"command": "powershell",
+			"args": ["-ExecutionPolicy", "Bypass", "-File", "./scripts/startup_cleanup.ps1"],
+			"group": "build",
+			"presentation": {
+				"echo": false,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": false,
+				"clear": false
+			},
+			"runOptions": {
+				"runOn": "folderOpen"
+			}
+		},
+		{
 			"label": "Run Live Dashboard",
 			"type": "shell",
 			"command": "\"C:/Users/will7/OneDrive - Sygma Data Analytics/Stock Trading/Scalping Bot System/.venv/Scripts/python.exe\" live_dashboard.py",
@@ -13,6 +31,13 @@
 			"type": "shell",
 			"command": "& \"C:/Users/will7/OneDrive - Sygma Data Analytics/Stock Trading/Scalping Bot System/.venv/Scripts/python.exe\" live_dashboard.py",
 			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Prevent Workspace Pollution",
+			"type": "shell",
+			"command": "powershell",
+			"args": ["-ExecutionPolicy", "Bypass", "-File", "./scripts/prevent_workspace_pollution.ps1"],
 			"group": "build"
 		}
 	]

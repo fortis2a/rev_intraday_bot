@@ -51,3 +51,23 @@ Thumbs.db
 temp_*
 scratch_*
 *.tmp
+# Auto-added pollution prevention
+# Temporary pollution files
+pnl_monitor.py
+*_temp*.py
+*_debug*.py
+*_test*.py
+temp_*.py
+debug_*.py
+organize*.py
+cleanup*.py
+phase*.py
+*_backup*.py
+
+# IDE pollution
+.vscode/tasks.json.backup
+.vscode/settings.json.backup
+
+# Python pollution
+*.pyc.temp
+*.py.bak
