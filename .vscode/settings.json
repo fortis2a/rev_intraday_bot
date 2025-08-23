@@ -1,42 +1,49 @@
 {
-  "files.exclude": {
-    "**/archive/**": true,
-    "**/backup_untracked_*/**": true,
-    "**/tests/**": true,
-    "**/__pycache__/**": true,
-    "**/*.pyc": true,
-    "**/.git": true,
-    "**/.DS_Store": true,
-    "**/Thumbs.db": true,
-    "**/node_modules": true,
-    "**/documentation/**": true
-  },
-  "search.exclude": {
-    "**/archive/**": true,
-    "**/backup_untracked_*/**": true,
-    "**/tests/**": true,
-    "**/__pycache__/**": true,
-    "**/*.pyc": true,
-    "**/.git": true,
-    "**/node_modules": true,
-    "**/documentation/**": true,
-    "**/*.min.js": true
-  },
-  "files.watcherExclude": {
-    "**/archive/**": true,
-    "**/backup_untracked_*/**": true,
-    "**/tests/**": true,
-    "**/__pycache__/**": true,
-    "**/.git/objects/**": true,
-    "**/.git/subtree-cache/**": true,
-    "**/node_modules/*/**": true,
-    "**/documentation/**": true
-  },
-  "explorer.excludeGitIgnore": true,
-  "python.defaultInterpreterPath": "./.venv/Scripts/python.exe",
-  "python.terminal.activateEnvironment": true,
-  "files.associations": {
-    "*.bat": "batch",
-    "*.ps1": "powershell"
-  }
+    "files.exclude":  {
+                          "**/archive/**":  true,
+                          "**/backup_untracked_*/**":  true,
+                          "**/tests/**":  true,
+                          "**/__pycache__/**":  true,
+                          "**/*.pyc":  true,
+                          "**/.git":  true,
+                          "**/.DS_Store":  true,
+                          "**/Thumbs.db":  true,
+                          "**/node_modules":  true,
+                          "**/documentation/**":  true,
+                          "**/real-time-*.py":  true,
+                          "**/diagnose-*.py":  true,
+                          "**/organize*.py":  true,
+                          "**/phase*.py":  true,
+                          "**/cleanup*.py":  true,
+                          "**/debug_*.py":  true,
+                          "**/*-monitor.py":  true
+                      },
+    "search.exclude":  {
+                           "**/archive/**":  true,
+                           "**/backup_untracked_*/**":  true,
+                           "**/tests/**":  true,
+                           "**/__pycache__/**":  true,
+                           "**/*.pyc":  true,
+                           "**/.git":  true,
+                           "**/node_modules":  true,
+                           "**/documentation/**":  true,
+                           "**/*.min.js":  true
+                       },
+    "files.watcherExclude":  {
+                                 "**/archive/**":  true,
+                                 "**/backup_untracked_*/**":  true,
+                                 "**/tests/**":  true,
+                                 "**/__pycache__/**":  true,
+                                 "**/.git/objects/**":  true,
+                                 "**/.git/subtree-cache/**":  true,
+                                 "**/node_modules/*/**":  true,
+                                 "**/documentation/**":  true
+                             },
+    "explorer.excludeGitIgnore":  true,
+    "python.defaultInterpreterPath":  "./.venv/Scripts/python.exe",
+    "python.terminal.activateEnvironment":  true,
+    "files.associations":  {
+                               "*.bat":  "batch",
+                               "*.ps1":  "powershell"
+                           }
 }

@@ -71,3 +71,6 @@ phase*.py
 # Python pollution
 *.pyc.temp
 *.py.bak
+diagnose-*.py
+real-time-*.py
+*-monitor.py
