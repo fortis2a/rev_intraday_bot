@@ -29,8 +29,8 @@ def main():
     print("🚀 Running CI/CD checks locally...")
     print("This will run the same checks that GitHub Actions will run")
     
-    # Change to project root
-    project_root = Path(__file__).parent
+    # Change to project root (parent of cicd folder)
+    project_root = Path(__file__).parent.parent
     os.chdir(project_root)
     
     checks = [
