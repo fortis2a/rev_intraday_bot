@@ -232,8 +232,8 @@ class MarketCloseReportGenerator:
         # Risk metrics (using corrected P&L calculation)
         risk_metrics = self._calculate_risk_metrics_with_correct_pnl()
         
-        # Trading psychology metrics
-        trading_psychology = self._analyze_trading_psychology(df_with_pnl)
+        # Trading psychology metrics (using corrected P&L calculation)
+        trading_psychology = self._analyze_trading_psychology_with_correct_pnl()
         
         # Generate trading recommendations
         recommendations = self._generate_recommendations(symbol_analysis, time_analysis, side_analysis, statistical_analysis, risk_metrics)
@@ -911,6 +911,102 @@ class MarketCloseReportGenerator:
             'revenge_trading_ratio': revenge_ratio
         }
 
+    def _analyze_trading_psychology_with_correct_pnl(self):
+        """Analyze trading psychology using corrected P&L calculations for completed trades only"""
+        try:
+            # Get corrected P&L values for individual completed trades
+            corrected_pnl_values = self._get_corrected_trade_pnl_values()
+            
+            if not corrected_pnl_values:
+                return {}
+            
+            # Analyze consecutive patterns using corrected P&L
+            consecutive_patterns = self._analyze_consecutive_patterns_corrected(corrected_pnl_values)
+            
+            # Get timing data from actual API activities for completed trades
+            activities = self.api.get_activities(activity_types='FILL')
+            from datetime import date
+            today_activities = [a for a in activities if a.transaction_time.date() == date.today()]
+            
+            # Filter to sell activities only (completed trades)
+            sell_activities = [a for a in today_activities if a.side in ['sell', 'sell_short']]
+            
+            if len(sell_activities) > 1:
+                # Calculate time between completed trades
+                sell_times = [a.transaction_time for a in sell_activities]
+                sell_times.sort()
+                
+                time_diffs = []
+                for i in range(1, len(sell_times)):
+                    diff = (sell_times[i] - sell_times[i-1]).total_seconds() / 60  # minutes
+                    time_diffs.append(diff)
+                
+                avg_time_between_trades = sum(time_diffs) / len(time_diffs) if time_diffs else 0
+                
+                # Count rapid fire trades (within 5 minutes between completed trades)
+                rapid_trades = len([d for d in time_diffs if d < 5])
+            else:
+                avg_time_between_trades = 0
+                rapid_trades = 0
+            
+            # Calculate rapid trade ratio
+            total_completed_trades = len(corrected_pnl_values)
+            rapid_trade_ratio = rapid_trades / total_completed_trades if total_completed_trades > 0 else 0
+            
+            return {
+                **consecutive_patterns,
+                'avg_time_between_trades_minutes': avg_time_between_trades,
+                'rapid_fire_trades': rapid_trades,
+                'rapid_trade_ratio': rapid_trade_ratio,
+                'total_completed_trades': total_completed_trades,
+                'potential_overtrading': rapid_trade_ratio > 0.3
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in corrected trading psychology analysis: {e}")
+            return {}
+
+    def _analyze_consecutive_patterns_corrected(self, pnl_values):
+        """Analyze consecutive wins and losses using corrected P&L values"""
+        if len(pnl_values) == 0:
+            return {}
+        
+        # Convert to win/loss sequence
+        win_loss_sequence = ['W' if pnl > 0 else 'L' if pnl < 0 else 'B' for pnl in pnl_values]
+        
+        # Find consecutive patterns
+        current_streak = 1
+        current_type = win_loss_sequence[0]
+        max_win_streak = 0
+        max_loss_streak = 0
+        
+        for i in range(1, len(win_loss_sequence)):
+            if win_loss_sequence[i] == current_type:
+                current_streak += 1
+            else:
+                # Update max streaks
+                if current_type == 'W':
+                    max_win_streak = max(max_win_streak, current_streak)
+                elif current_type == 'L':
+                    max_loss_streak = max(max_loss_streak, current_streak)
+                
+                # Reset for new streak
+                current_streak = 1
+                current_type = win_loss_sequence[i]
+        
+        # Check final streak
+        if current_type == 'W':
+            max_win_streak = max(max_win_streak, current_streak)
+        elif current_type == 'L':
+            max_loss_streak = max(max_loss_streak, current_streak)
+        
+        return {
+            'max_consecutive_wins': max_win_streak,
+            'max_consecutive_losses': max_loss_streak,
+            'current_streak_type': current_type,
+            'current_streak_length': current_streak
+        }
+
     def _generate_recommendations(self, symbol_analysis, time_analysis, side_analysis, statistical_analysis=None, risk_metrics=None):
         """Generate trading recommendations based on analysis"""
         recommendations = []
@@ -1128,9 +1224,13 @@ class MarketCloseReportGenerator:
 
         # For counting today's activities only 
         today_activities = all_activities[all_activities['filled_at'].dt.date == today_date]
+        
+        # Count COMPLETED TRADES (sell transactions) to match statistical analysis
+        completed_trades = len(today_activities[today_activities['side'].isin(['sell', 'sell_short'])])
 
         return {
-            'total_trades': len(today_activities),
+            'total_trades': completed_trades,  # Count completed trades (sells) to match statistical analysis
+            'total_activities': len(today_activities),  # Total activities for reference
             'total_volume': today_activities['value'].sum(),
             'net_pnl': total_realized_pnl,  # Cross-day realized P&L (matches Alpaca)
             'unique_symbols': today_activities['symbol'].nunique(),
@@ -1238,8 +1338,12 @@ class MarketCloseReportGenerator:
             last_trade = max(trade['filled_at'] for trade in today_trades_data) if today_trades_data else None
             trading_span_hours = (last_trade - first_trade).total_seconds() / 3600 if first_trade and last_trade else 0
             
+            # Count COMPLETED TRADES (sell transactions) to match statistical analysis
+            completed_trades = sell_orders + short_sell_orders
+            
             return {
-                'total_trades': len(today_trades_data),
+                'total_trades': completed_trades,  # Count completed trades (sells) to match statistical analysis
+                'total_activities': len(today_trades_data),  # Total activities for reference
                 'total_volume': total_volume,
                 'net_pnl': total_realized_pnl,  # Today-only realized P&L (closest match to Alpaca)
                 'unique_symbols': len(set(trade['symbol'] for trade in today_trades_data)),
@@ -1290,12 +1394,16 @@ class MarketCloseReportGenerator:
         sell_orders = sum(1 for a in today_trades if a.side == 'sell')
         short_sell_orders = sum(1 for a in today_trades if a.side == 'sell_short')
         
+        # Count COMPLETED TRADES (sell transactions) to match statistical analysis
+        completed_trades = sell_orders + short_sell_orders
+        
         first_trade = min(a.transaction_time for a in today_trades)
         last_trade = max(a.transaction_time for a in today_trades)
         trading_span = (last_trade - first_trade).total_seconds() / 3600
         
         return {
-            'total_trades': len(today_trades),
+            'total_trades': completed_trades,  # Count completed trades (sells) to match statistical analysis
+            'total_activities': len(today_trades),  # Total activities for reference
             'total_volume': total_volume,
             'net_pnl': total_realized_pnl,  # Cross-day round-trip P&L
             'unique_symbols': len(set(a.symbol for a in today_trades)),
@@ -1377,7 +1485,10 @@ class MarketCloseReportGenerator:
                     # Calculate symbol statistics from today's trades
                     symbol_trades = [t for t in today_trades_data if t['symbol'] == symbol]
                     symbol_volume = sum(t['value'] for t in symbol_trades)
-                    symbol_trade_count = len(symbol_trades)
+                    
+                    # Count COMPLETED TRADES (sells) per symbol to match our standard
+                    symbol_completed_trades = len([t for t in symbol_trades if t['side'] in ['sell', 'sell_short']])
+                    
                     symbol_buys = len([t for t in symbol_trades if t['side'] == 'buy'])
                     symbol_sells = len([t for t in symbol_trades if t['side'] in ['sell', 'sell_short']])
                     
@@ -1385,14 +1496,15 @@ class MarketCloseReportGenerator:
                         'total_pnl': symbol_pnl,
                         'pnl': symbol_pnl,
                         'total_volume': symbol_volume,
-                        'trade_count': symbol_trade_count,
-                        'total_trades': symbol_trade_count,
-                        'avg_trade_size': symbol_volume / symbol_trade_count if symbol_trade_count > 0 else 0,
+                        'trade_count': symbol_completed_trades,  # Now counts completed trades only
+                        'total_activities': len(symbol_trades),  # Total activities for reference
+                        'total_trades': symbol_completed_trades,  # Completed trades for consistency
+                        'avg_trade_size': symbol_volume / symbol_completed_trades if symbol_completed_trades > 0 else 0,
                         'profit_factor': abs(symbol_pnl) / max(symbol_volume * 0.01, 1),
                         'win_rate': 100.0 if symbol_pnl > 0 else 0.0,
                         'wins': 1 if symbol_pnl > 0 else 0,
                         'losses': 1 if symbol_pnl < 0 else 0,
-                        'trades': symbol_trade_count,
+                        'trades': symbol_completed_trades,  # Completed trades for HTML display
                         'avg_trade_time': 15.0,
                         'volatility': 1.0,
                         'sharpe_ratio': 1.0 if symbol_pnl > 0 else 0.0,
@@ -1683,6 +1795,80 @@ class MarketCloseReportGenerator:
         
         return pd.DataFrame(filtered_trades) if filtered_trades else pd.DataFrame()
 
+    def _get_corrected_trade_pnl_values(self):
+        """Extract individual trade P&L values using corrected FIFO calculation"""
+        try:
+            # Use the same logic as the statistical analysis
+            activities = self.api.get_activities(activity_types='FILL')
+            today_activities_direct = [a for a in activities if a.transaction_time.date() == date.today()]
+            
+            if not today_activities_direct:
+                return []
+            
+            # Convert to trade data format
+            today_trades_data = []
+            for activity in today_activities_direct:
+                today_trades_data.append({
+                    'symbol': activity.symbol,
+                    'side': activity.side,
+                    'qty': float(activity.qty),
+                    'price': float(activity.price),
+                    'filled_at': activity.transaction_time
+                })
+            
+            # Group by symbol and calculate P&L for each trade
+            buys_today = {}
+            sells_today = {}
+            
+            for trade in today_trades_data:
+                symbol = trade['symbol']
+                side = trade['side']
+                qty = trade['qty']
+                price = trade['price']
+                
+                if side == 'buy':
+                    if symbol not in buys_today:
+                        buys_today[symbol] = []
+                    buys_today[symbol].append((qty, price))
+                else:  # sell or sell_short
+                    if symbol not in sells_today:
+                        sells_today[symbol] = []
+                    sells_today[symbol].append((qty, price))
+            
+            # Calculate individual trade P&L values in chronological order
+            trade_pnl_values = []
+            
+            # Calculate P&L for symbols that have both buys and sells today
+            for symbol in sells_today:
+                if symbol in buys_today:
+                    buy_queue = buys_today[symbol][:]
+                    
+                    for sell_qty, sell_price in sells_today[symbol]:
+                        remaining_sell = sell_qty
+                        trade_pnl = 0
+                        
+                        while remaining_sell > 0 and buy_queue:
+                            buy_qty, buy_price = buy_queue[0]
+                            
+                            match_qty = min(remaining_sell, buy_qty)
+                            pnl = match_qty * (sell_price - buy_price)
+                            trade_pnl += pnl
+                            
+                            remaining_sell -= match_qty
+                            buy_queue[0] = (buy_qty - match_qty, buy_price)
+                            
+                            if buy_queue[0][0] == 0:
+                                buy_queue.pop(0)
+                        
+                        # Record this trade's P&L
+                        trade_pnl_values.append(trade_pnl)
+            
+            return trade_pnl_values
+            
+        except Exception as e:
+            self.logger.error(f"Error getting corrected trade P&L values: {e}")
+            return []
+
     def create_charts(self, analysis_data):
         """Create comprehensive visualization charts including statistical analysis"""
         
@@ -1782,10 +1968,28 @@ class MarketCloseReportGenerator:
         # Chart 5: Equity Curve (spans both columns in bottom row)
         ax5 = fig.add_subplot(gs[2, :])
         if not trades_df.empty:
-            # Calculate cumulative P&L and drawdown
-            cumulative_pnl = trades_df['cash_flow'].cumsum()
-            running_max = cumulative_pnl.expanding().max()
-            drawdown = cumulative_pnl - running_max
+            # Get corrected P&L values for equity curve
+            corrected_pnl_values = self._get_corrected_trade_pnl_values()
+            
+            if corrected_pnl_values:
+                # Use corrected P&L calculation
+                cumulative_pnl = np.cumsum(corrected_pnl_values)
+                running_max = np.maximum.accumulate(cumulative_pnl)
+                drawdown = cumulative_pnl - running_max
+                
+                # Calculate corrected statistics
+                total_return = cumulative_pnl[-1] if len(cumulative_pnl) > 0 else 0
+                max_dd = drawdown.min() if len(drawdown) > 0 else 0
+                win_rate = len([p for p in corrected_pnl_values if p > 0]) / len(corrected_pnl_values) * 100 if corrected_pnl_values else 0
+            else:
+                # Fallback to old calculation
+                cumulative_pnl = trades_df['cash_flow'].cumsum()
+                running_max = cumulative_pnl.expanding().max()
+                drawdown = cumulative_pnl - running_max
+                
+                total_return = cumulative_pnl.iloc[-1] if len(cumulative_pnl) > 0 else 0
+                max_dd = drawdown.min() if len(drawdown) > 0 else 0
+                win_rate = len(trades_df[trades_df['cash_flow'] > 0]) / len(trades_df) * 100 if len(trades_df) > 0 else 0
             
             # Plot equity curve
             ax5.plot(range(len(cumulative_pnl)), cumulative_pnl, 'b-', linewidth=3, label='Cumulative P&L', alpha=0.8)
@@ -1800,10 +2004,6 @@ class MarketCloseReportGenerator:
             ax5.grid(True, alpha=0.3)
             
             # Add key statistics as text
-            total_return = cumulative_pnl.iloc[-1] if len(cumulative_pnl) > 0 else 0
-            max_dd = drawdown.min() if len(drawdown) > 0 else 0
-            win_rate = len(trades_df[trades_df['cash_flow'] > 0]) / len(trades_df) * 100 if len(trades_df) > 0 else 0
-            
             stats_text = f'Total Return: ${total_return:.2f} | Max Drawdown: ${max_dd:.2f} | Win Rate: {win_rate:.1f}%'
             ax5.text(0.02, 0.98, stats_text, transform=ax5.transAxes, fontsize=11, 
                     verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
@@ -1840,21 +2040,28 @@ class MarketCloseReportGenerator:
         risk_metrics = analysis_data.get('risk_metrics', {})
         psychology = analysis_data.get('trading_psychology', {})
         
+        # Get corrected P&L values for charts
+        corrected_pnl_values = self._get_corrected_trade_pnl_values()
+        
         # 1. P&L Distribution (Row 1, Col 1-2)
         ax1 = fig.add_subplot(gs[0, :2])
-        pnl_values = trades_df['cash_flow'].values
-        n_bins = min(20, len(pnl_values) // 2) if len(pnl_values) > 10 else len(pnl_values)
-        ax1.hist(pnl_values, bins=n_bins, alpha=0.7, color='skyblue', edgecolor='black', density=True)
-        ax1.axvline(np.mean(pnl_values), color='red', linestyle='--', linewidth=2, 
-                   label=f'Mean: ${np.mean(pnl_values):.2f}')
-        ax1.axvline(np.median(pnl_values), color='green', linestyle='--', linewidth=2,
-                   label=f'Median: ${np.median(pnl_values):.2f}')
+        pnl_values = corrected_pnl_values if corrected_pnl_values else trades_df['cash_flow'].values
+        
+        # Convert to numpy array for consistent handling
+        pnl_array = np.array(pnl_values)
+        
+        n_bins = min(20, len(pnl_array) // 2) if len(pnl_array) > 10 else len(pnl_array)
+        ax1.hist(pnl_array, bins=n_bins, alpha=0.7, color='skyblue', edgecolor='black', density=True)
+        ax1.axvline(np.mean(pnl_array), color='red', linestyle='--', linewidth=2, 
+                   label=f'Mean: ${np.mean(pnl_array):.2f}')
+        ax1.axvline(np.median(pnl_array), color='green', linestyle='--', linewidth=2,
+                   label=f'Median: ${np.median(pnl_array):.2f}')
         
         # Add normal distribution overlay if data is sufficient
-        if len(pnl_values) > 5:
-            x = np.linspace(pnl_values.min(), pnl_values.max(), 100)
+        if len(pnl_array) > 5:
+            x = np.linspace(pnl_array.min(), pnl_array.max(), 100)
             from scipy.stats import norm
-            y = norm.pdf(x, np.mean(pnl_values), np.std(pnl_values))
+            y = norm.pdf(x, np.mean(pnl_array), np.std(pnl_array))
             ax1.plot(x, y, 'orange', linewidth=2, label='Normal Distribution')
         
         ax1.set_xlabel('P&L ($)')
@@ -1865,16 +2072,21 @@ class MarketCloseReportGenerator:
         
         # 2. Box Plot (Row 1, Col 3)
         ax2 = fig.add_subplot(gs[0, 2])
-        box_plot = ax2.boxplot(pnl_values, vert=True, patch_artist=True)
+        box_plot = ax2.boxplot(pnl_array, vert=True, patch_artist=True)
         box_plot['boxes'][0].set_facecolor('lightblue')
         ax2.set_ylabel('P&L ($)')
         ax2.set_title('P&L Box Plot', fontweight='bold', fontsize=14)
         ax2.grid(True, alpha=0.3)
         
         # 3. Equity Curve and Drawdown (Row 2, spans all columns)
-        cumulative_pnl = trades_df['cash_flow'].cumsum()
-        running_max = cumulative_pnl.expanding().max()
-        drawdown = cumulative_pnl - running_max
+        if corrected_pnl_values:
+            cumulative_pnl = np.cumsum(corrected_pnl_values)
+            running_max = np.maximum.accumulate(cumulative_pnl)
+            drawdown = cumulative_pnl - running_max
+        else:
+            cumulative_pnl = trades_df['cash_flow'].cumsum()
+            running_max = cumulative_pnl.expanding().max()
+            drawdown = cumulative_pnl - running_max
         
         ax3 = fig.add_subplot(gs[1, :])
         ax3.plot(range(len(cumulative_pnl)), cumulative_pnl, 'b-', linewidth=2, label='Cumulative P&L')
@@ -1934,22 +2146,35 @@ class MarketCloseReportGenerator:
         # 6. Performance Metrics (Row 3, Col 3)
         ax6 = fig.add_subplot(gs[2, 2])
         perf_names = ['Win Rate\n%', 'Profit\nFactor', 'Kelly\nCriterion']
-        perf_values = [
-            stats.get('win_rate', 0),
-            min(stats.get('profit_factor', 0), 10),  # Cap for visualization
-            risk_metrics.get('kelly_criterion', 0) * 100  # Convert to percentage
-        ]
         
+        # Get the actual values without artificial caps
+        win_rate_val = stats.get('win_rate', 0)
+        profit_factor_val = stats.get('profit_factor', 0)
+        kelly_val = risk_metrics.get('kelly_criterion', 0) * 100  # Convert to percentage
+        
+        perf_values = [win_rate_val, profit_factor_val, kelly_val]
+        
+        # Use different scales for better visualization
         bars3 = ax6.bar(perf_names, perf_values, color='purple', alpha=0.7)
         ax6.set_title('Performance Metrics', fontweight='bold', fontsize=12)
         ax6.set_ylabel('Value')
         ax6.grid(True, alpha=0.3)
         
-        # Add value labels
-        for bar, val in zip(bars3, perf_values):
+        # Add value labels with appropriate formatting
+        for bar, val, name in zip(bars3, perf_values, perf_names):
             height = bar.get_height()
+            if 'Profit' in name and val > 100:
+                # For large profit factors, show with 1 decimal
+                label_text = f'{val:.1f}'
+            elif 'Win Rate' in name:
+                # Win rate as percentage
+                label_text = f'{val:.1f}%'
+            else:
+                # Kelly criterion and others
+                label_text = f'{val:.1f}'
+                
             ax6.text(bar.get_x() + bar.get_width()/2., height + height*0.02,
-                    f'{val:.1f}', ha='center', va='bottom', fontsize=10)
+                    label_text, ha='center', va='bottom', fontsize=10)
         
         # 7. Holding Period Analysis (Row 4, Col 1-2) - Skip if no holding period data
         if 'holding_period_minutes' in trades_df.columns and not trades_df['holding_period_minutes'].isna().all():
