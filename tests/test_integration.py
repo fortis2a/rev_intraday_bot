@@ -67,8 +67,7 @@ class TestSystemIntegration:
     def test_reporting_system_import(self):
         """Test reporting system imports"""
         try:
-            from reporting.generate_todays_pnl import \
-                generate_todays_pnl_report
+            from reporting.generate_todays_pnl import generate_todays_pnl_report
             from reporting.today_analysis import TodayAnalysis
 
             assert TodayAnalysis.__name__ == "TodayAnalysis"

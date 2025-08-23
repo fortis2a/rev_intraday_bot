@@ -1566,8 +1566,7 @@ class IntradayEngine:
                     )
 
                     # Recalculate stop loss and profit target based on ACTUAL execution price
-                    from utils.signal_helper import \
-                        calculate_adaptive_signal_levels
+                    from utils.signal_helper import calculate_adaptive_signal_levels
 
                     actual_levels = calculate_adaptive_signal_levels(
                         symbol=signal.symbol,
@@ -1677,10 +1676,10 @@ class IntradayEngine:
 
                     # 🔍 ENHANCED: Capture complete decision context for trade analysis
                     try:
-                        from core.unified_indicators import \
-                            unified_indicator_service
-                        from stock_specific_config import \
-                            get_real_time_confidence_for_trade
+                        from core.unified_indicators import unified_indicator_service
+                        from stock_specific_config import (
+                            get_real_time_confidence_for_trade,
+                        )
 
                         # Get current indicator snapshot
                         bars = self.data_manager.get_bars(

@@ -115,8 +115,7 @@ class TestBasicFunctionality:
     def test_import_reporting_modules(self):
         """Test importing reporting modules"""
         try:
-            from reporting.generate_todays_pnl import \
-                generate_todays_pnl_report
+            from reporting.generate_todays_pnl import generate_todays_pnl_report
             from reporting.today_analysis import TodayAnalysis
 
             assert all([TodayAnalysis, generate_todays_pnl_report])

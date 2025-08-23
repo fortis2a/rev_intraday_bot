@@ -16,8 +16,11 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from config import config
 from utils.logger import setup_logger
-from utils.price_utils import (calculate_trailing_stop_price, round_to_cent,
-                               validate_price_precision)
+from utils.price_utils import (
+    calculate_trailing_stop_price,
+    round_to_cent,
+    validate_price_precision,
+)
 
 
 @dataclass
@@ -490,8 +493,7 @@ class TrailingStopManager:
 
                         # Get stock-specific thresholds
                         try:
-                            from stock_specific_config import \
-                                get_stock_thresholds
+                            from stock_specific_config import get_stock_thresholds
 
                             thresholds = get_stock_thresholds(symbol)
                         except:

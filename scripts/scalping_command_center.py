@@ -26,13 +26,18 @@ try:
     from config import INTRADAY_WATCHLIST, config
     from core.data_manager import DataManager
     from core.risk_manager import RiskManager
+
     # Import real-time integrators
-    from scripts.alpaca_connector import (alpaca_connector,
-                                          get_real_strategy_performance,
-                                          get_real_trade_history,
-                                          start_alpaca_feed)
-    from scripts.confidence_integrator import (confidence_calculator,
-                                               start_confidence_feed)
+    from scripts.alpaca_connector import (
+        alpaca_connector,
+        get_real_strategy_performance,
+        get_real_trade_history,
+        start_alpaca_feed,
+    )
+    from scripts.confidence_integrator import (
+        confidence_calculator,
+        start_confidence_feed,
+    )
     from scripts.trade_log_parser import start_trade_monitoring, trade_parser
     from utils.logger import setup_logger
 
