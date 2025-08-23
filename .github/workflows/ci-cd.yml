@@ -73,14 +73,14 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements-ci.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
           
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-ci.txt
         
     - name: Run ${{ matrix.test-type }} tests
       run: |
@@ -111,7 +111,7 @@ jobs:
         pip install safety bandit
         
     - name: Check for known security vulnerabilities
-      run: safety check -r requirements.txt
+      run: safety check -r requirements-ci.txt
       
     - name: Run bandit security linter
       run: bandit -r . -x tests/,archive/,backup_*/
@@ -133,7 +133,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-ci.txt
         pip install pytest-benchmark
         
     - name: Run performance benchmarks
@@ -162,7 +162,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-ci.txt
         
     - name: Run paper trading validation
       env:
@@ -207,7 +207,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-ci.txt
         
     - name: Pre-deployment health check
       env:

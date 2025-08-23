@@ -6,7 +6,9 @@ numpy>=1.21.0
 python-dotenv>=0.19.0
 
 # Technical analysis
-talib-binary>=0.4.19
+# Note: talib-binary can be problematic in CI/CD environments
+# Using alternative or making it optional for CI builds
+# talib-binary>=0.4.19
 
 # Web dashboard dependencies  
 dash>=2.10.0
